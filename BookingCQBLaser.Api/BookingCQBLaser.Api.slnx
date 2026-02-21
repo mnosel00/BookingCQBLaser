@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="../BookingCQBLaser.Domain/BookingCQBLaser.Domain.csproj" />
+  <Project Path="../BookingCQBLaser.Infrastructure/BookingCQBLaser.Infrastructure.csproj" />
   <Project Path="BookingCQBLaser.Api/BookingCQBLaser.Api.csproj" />
 </Solution>
