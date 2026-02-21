@@ -1,4 +1,5 @@
 ﻿using BookingCQBLaser.Domain.Enums;
+using BookingCQBLaser.Domain.ValueObject;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,10 +13,7 @@ namespace BookingCQBLaser.Domain.Entities
         private const int TurnaroundBufferMinutes = 30;
 
         public Guid Id { get; private set; }
-        public string CustomerFirstName { get; private set; }
-        public string CustomerLastName { get; private set; }
-        public string CustomerEmail { get; private set; }
-        public string CustomerPhone { get; private set; }
+        public CustomerInfo Customer { get; private set; }
         public int ParticipantsCount { get; private set; }
         public PackageType Package { get; private set; }
         public DateTimeOffset StartTime { get; private set; }
@@ -27,10 +25,7 @@ namespace BookingCQBLaser.Domain.Entities
         private Booking() { }
 
         public Booking(
-            string firstName,
-            string lastName,
-            string email,
-            string phone,
+            CustomerInfo customer,
             int participantsCount,
             PackageType package,
             DateTimeOffset startTime)
@@ -38,21 +33,13 @@ namespace BookingCQBLaser.Domain.Entities
             Id = Guid.NewGuid();
             CreatedAt = DateTimeOffset.UtcNow;
 
-            SetCustomerDetails(firstName, lastName, email, phone);
+            Customer = customer ?? throw new ArgumentNullException(nameof(customer));
             SetBookingDetails(participantsCount, package, startTime);
         }
 
-        public void SetCustomerDetails(string firstName, string lastName, string email, string phone)
+        public void UpdateCustomer(CustomerInfo customer)
         {
-            if (string.IsNullOrWhiteSpace(firstName)) throw new ArgumentException("First name is required.", nameof(firstName));
-            if (string.IsNullOrWhiteSpace(lastName)) throw new ArgumentException("Last name is required.", nameof(lastName));
-            if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException("Email is required.", nameof(email));
-            if (string.IsNullOrWhiteSpace(phone)) throw new ArgumentException("Phone is required.", nameof(phone));
-
-            CustomerFirstName = firstName;
-            CustomerLastName = lastName;
-            CustomerEmail = email;
-            CustomerPhone = phone;
+            Customer = customer ?? throw new ArgumentNullException(nameof(customer));
         }
 
         public void SetBookingDetails(int participantsCount, PackageType package, DateTimeOffset startTime)
