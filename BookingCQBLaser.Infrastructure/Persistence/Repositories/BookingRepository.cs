@@ -1,9 +1,12 @@
-﻿using BookingCQBLaser.Infrastructure.Persistence.Configurations;
+﻿using BookingCQBLaser.Domain.Entities;
+using BookingCQBLaser.Domain.Interfaces;
+using BookingCQBLaser.Infrastructure.Persistence.Configurations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace BookingCQBLaser.Infrastructure.Persistence.Repositories
 {
