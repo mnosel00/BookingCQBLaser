@@ -97,7 +97,7 @@ StyleCopReport.xml
 *.pidb
 *.svclog
 *.scc
-
+lasertagbooking-*.json
 # Chutzpah Test files
 _Chutzpah*
 
