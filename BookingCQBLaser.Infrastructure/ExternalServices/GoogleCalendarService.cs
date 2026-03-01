@@ -21,7 +21,8 @@ public class GoogleCalendarService : IGoogleCalendarService
 
     private CalendarService CreateCalendarService()
     {
-        var credential = GoogleCredential.FromJson(_options.ServiceAccountJson)
+        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", _options.ServiceAccountJson);
+        var credential = GoogleCredential.GetApplicationDefault()
             .CreateScoped(_scopes);
 
         return new CalendarService(new BaseClientService.Initializer()
@@ -37,8 +38,8 @@ public class GoogleCalendarService : IGoogleCalendarService
 
         var request = new FreeBusyRequest
         {
-            TimeMin = startDate.UtcDateTime,
-            TimeMax = endDate.UtcDateTime,
+            TimeMinDateTimeOffset = startDate,
+            TimeMaxDateTimeOffset = endDate,
             Items = new List<FreeBusyRequestItem> { new FreeBusyRequestItem { Id = _options.CalendarId } }
         };
 
@@ -51,9 +52,9 @@ public class GoogleCalendarService : IGoogleCalendarService
         {
             foreach (var busyPeriod in calendarBusy.Busy)
             {
-                if (busyPeriod.Start.HasValue && busyPeriod.End.HasValue)
+                if (busyPeriod.StartDateTimeOffset.HasValue && busyPeriod.EndDateTimeOffset.HasValue)
                 {
-                    busyList.Add((busyPeriod.Start.Value, busyPeriod.End.Value));
+                    busyList.Add((busyPeriod.StartDateTimeOffset.Value, busyPeriod.EndDateTimeOffset.Value));
                 }
             }
         }
@@ -74,13 +75,11 @@ public class GoogleCalendarService : IGoogleCalendarService
                           $"Email: {booking.Customer.Email}",
             Start = new EventDateTime
             {
-                DateTime = booking.StartTime.UtcDateTime,
-                TimeZone = "UTC"
+                DateTimeDateTimeOffset = booking.StartTime
             },
             End = new EventDateTime
             {
-                DateTime = booking.EndTime.UtcDateTime,
-                TimeZone = "UTC"
+                DateTimeDateTimeOffset = booking.EndTime
             },
         };
 
