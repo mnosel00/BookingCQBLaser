@@ -1,4 +1,6 @@
+using BookingCQBLaser.Application.Services;
 using BookingCQBLaser.Domain.Interfaces;
+using BookingCQBLaser.Infrastructure.ExternalServices;
 using BookingCQBLaser.Infrastructure.Persistence.Configurations;
 using BookingCQBLaser.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -9,10 +11,31 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Configure Google Calendar options
+builder.Services.Configure<GoogleCalendarOptions>(
+    builder.Configuration.GetSection("GoogleCalendarOptions"));
+
+// Register repositories
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 
+// Register external services
+builder.Services.AddScoped<IGoogleCalendarService, GoogleCalendarService>();
+
+// Register application services
+builder.Services.AddScoped<IBookingService, BookingService>();
+
+// Configure CORS for Angular development
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AngularApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -26,6 +49,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("AngularApp");
 
 app.UseAuthorization();
 
