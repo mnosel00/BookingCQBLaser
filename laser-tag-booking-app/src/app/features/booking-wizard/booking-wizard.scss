@@ -1,4 +1,4 @@
-/* filepath: c:\Users\Mateusz\source\repos\BookingCQBLaser\laser-tag-booking-app\src\app\features\booking-wizard\booking-wizard.component.scss */
+/* filepath: c:\Users\Mateusz\source\repos\BookingCQBLaser\laser-tag-booking-app\src\app\features\booking-wizard\booking-wizard.scss */
 :host {
   --bg: #f8fafc;
   --surface: #ffffff;
@@ -175,31 +175,40 @@ section[aria-labelledby='step-2-title'] li {
 
 section[aria-labelledby='step-2-title'] li button {
   width: 100%;
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #3730a3;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
   border-radius: 999px;
-  padding: 0.62rem 0.9rem;
-  font-weight: 700;
+  padding: 0.7rem 1rem;
+  font-weight: 800;
+  font-size: 0.97rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.18s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
 
 section[aria-labelledby='step-2-title'] li button:hover {
   transform: translateY(-1px);
-  border-color: #818cf8;
-  background: #e0e7ff;
-  box-shadow: 0 8px 16px rgba(79, 70, 229, 0.18);
+  border-color: #4f46e5;
+  background: #4f46e5;
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.24);
+}
+
+section[aria-labelledby='step-2-title'] li button:active {
+  transform: translateY(0);
 }
 
 section[aria-labelledby='step-2-title'] li button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 4px var(--ring), 0 8px 16px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 0 0 4px var(--ring), 0 10px 20px rgba(79, 70, 229, 0.24);
 }
 
 section[aria-labelledby='step-2-title'] > p {
   margin-top: 0.75rem;
-  padding: 0.75rem 0.9rem;
+  padding: 0.8rem 0.95rem;
   border-radius: 12px;
   border: 1px dashed #cbd5e1;
   color: var(--muted);

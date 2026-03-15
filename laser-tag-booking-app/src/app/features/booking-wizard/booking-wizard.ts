@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BookingApiService } from '../../services/booking-api';
@@ -7,7 +7,7 @@ import { CreateBookingRequest, PackageType, TimeSlot } from '../../models/bookin
 @Component({
   selector: 'app-booking-wizard',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, DatePipe],
   templateUrl: './booking-wizard.html',
   styleUrl: './booking-wizard.scss'
 })
