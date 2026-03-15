@@ -1,0 +1,88 @@
+<main class="booking-wizard">
+  <header>
+    <h1>Booking Wizard</h1>
+    <p>Step {{ currentStep }} of 3</p>
+  </header>
+
+  <p *ngIf="successMessage" role="status">
+    {{ successMessage }}
+  </p>
+
+  <section *ngIf="currentStep === 1" aria-labelledby="step-1-title">
+    <h2 id="step-1-title">Step 1: Choose Package</h2>
+    <div class="package-grid">
+      <button
+        type="button"
+        *ngFor="let pkg of packageOptions"
+        (click)="selectPackage(pkg.value)"
+      >
+        {{ pkg.label }}
+      </button>
+    </div>
+  </section>
+
+  <section *ngIf="currentStep === 2" aria-labelledby="step-2-title">
+    <h2 id="step-2-title">Step 2: Choose Date and Time Slot</h2>
+
+    <label for="bookingDate">Date</label>
+    <input
+      id="bookingDate"
+      type="date"
+      [value]="selectedDateValue"
+      (change)="onDateChange(($any($event.target)).value)"
+    />
+
+    <p *ngIf="isLoadingSlots">Loading slots...</p>
+
+    <ng-container *ngIf="!isLoadingSlots">
+      <ul *ngIf="availableSlots.length > 0; else noSlots">
+        <li *ngFor="let slot of availableSlots">
+          <button type="button" (click)="selectSlot(slot)">
+            {{ slot.startTime }} - {{ slot.endTime }}
+          </button>
+        </li>
+      </ul>
+      <ng-template #noSlots>
+        <p *ngIf="selectedDate">No available slots for the selected date.</p>
+      </ng-template>
+    </ng-container>
+  </section>
+
+  <section *ngIf="currentStep === 3" aria-labelledby="step-3-title">
+    <h2 id="step-3-title">Step 3: Customer Details</h2>
+
+    <p>
+      Selected slot:
+      <strong>{{ selectedSlot?.startTime }} - {{ selectedSlot?.endTime }}</strong>
+    </p>
+
+    <form [formGroup]="customerForm" (ngSubmit)="submitBooking()" novalidate>
+      <div>
+        <label for="firstName">First Name</label>
+        <input id="firstName" type="text" formControlName="firstName" />
+      </div>
+
+      <div>
+        <label for="lastName">Last Name</label>
+        <input id="lastName" type="text" formControlName="lastName" />
+      </div>
+
+      <div>
+        <label for="email">Email</label>
+        <input id="email" type="email" formControlName="email" />
+      </div>
+
+      <div>
+        <label for="phone">Phone</label>
+        <input id="phone" type="tel" formControlName="phone" />
+      </div>
+
+      <div>
+        <label for="participantsCount">Participants</label>
+        <input id="participantsCount" type="number" min="1" formControlName="participantsCount" />
+      </div>
+
+      <button type="submit" [disabled]="isSubmitting">Confirm Booking</button>
+    </form>
+  </section>
+</main>
