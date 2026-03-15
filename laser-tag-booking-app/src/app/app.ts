@@ -8,4 +8,4 @@ import { BookingWizard } from '../app/features/booking-wizard/booking-wizard';
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
-export class AppComponent {}
+export class App {}
