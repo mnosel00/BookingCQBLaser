@@ -33,7 +33,8 @@ public class BookingService : IBookingService
         PackageType package,
         CancellationToken cancellationToken = default)
     {
-        var totalDurationMinutes = package.GetBaseDurationMinutes() + TurnaroundBufferMinutes;
+        var packageBaseDuration = package.GetBaseDurationMinutes();
+        var totalDurationMinutes = packageBaseDuration + TurnaroundBufferMinutes;
 
         var dayStart = new DateTimeOffset(
             date.Year, date.Month, date.Day,
@@ -56,7 +57,8 @@ public class BookingService : IBookingService
 
             if (!OverlapsWithBusyPeriods(currentSlotStart, currentSlotEnd, busyPeriods))
             {
-                availableSlots.Add(new TimeSlotDto(currentSlotStart, currentSlotEnd));
+                var displaySlotEnd = currentSlotStart.AddMinutes(packageBaseDuration);
+                availableSlots.Add(new TimeSlotDto(currentSlotStart, displaySlotEnd));
             }
 
             currentSlotStart = currentSlotStart.AddMinutes(SlotIntervalMinutes);
