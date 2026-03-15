@@ -23,7 +23,7 @@
 }
 
 .booking-wizard {
-  width: min(960px, 100%);
+  width: min(1100px, 100%);
   margin-inline: auto;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(226, 232, 240, 0.8);
@@ -122,41 +122,110 @@ input.ng-invalid.ng-touched {
   box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.16);
 }
 
-/* Step 1 - packages */
+/* Step 1 - pricing cards */
 .package-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 0.85rem;
+  grid-template-columns: 1fr;
+  gap: 1rem;
 }
 
-.package-grid button {
-  border: 1px solid var(--border);
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
-  border-radius: 16px;
-  min-height: 74px;
-  padding: 0.85rem 1rem;
-  font-weight: 700;
-  font-size: 1rem;
-  color: #0f172a;
+@media (min-width: 760px) {
+  .package-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .package-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.package-card {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #dbe4f0;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 18px;
+  min-height: 220px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
-.package-grid button:hover {
-  transform: translateY(-2px);
+.package-card:hover {
+  transform: translateY(-3px);
   border-color: #a5b4fc;
-  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.15);
-  background: linear-gradient(180deg, #eef2ff, #e0e7ff);
+  box-shadow: 0 14px 28px rgba(79, 70, 229, 0.14);
+  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
 }
 
-.package-grid button:focus-visible,
-.package-grid button.selected,
-.package-grid button[aria-pressed='true'] {
+.package-card:focus-visible {
   outline: none;
   border-color: var(--primary);
-  background: linear-gradient(180deg, #eef2ff, #e0e7ff);
-  box-shadow: 0 0 0 4px var(--ring), 0 8px 18px rgba(79, 70, 229, 0.18);
+  box-shadow: 0 0 0 4px var(--ring), 0 14px 28px rgba(79, 70, 229, 0.16);
+}
+
+.package-card.selected,
+.package-card[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+  box-shadow: 0 0 0 4px var(--ring), 0 16px 30px rgba(79, 70, 229, 0.2);
+}
+
+.package-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.package-card h3 {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.package-card__price {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #312e81;
+}
+
+.package-card__duration {
+  margin: 0;
+  color: #4338ca;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.package-card__description {
+  margin: 0;
+  color: #334155;
+  line-height: 1.4;
+  font-size: 0.9rem;
+}
+
+.package-card__badge {
+  margin: auto 0 0;
+  align-self: flex-start;
+  padding: 0.32rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 /* Step 2 - date and slots */
@@ -206,7 +275,8 @@ section[aria-labelledby='step-2-title'] li button:focus-visible {
   box-shadow: 0 0 0 4px var(--ring), 0 10px 20px rgba(79, 70, 229, 0.24);
 }
 
-section[aria-labelledby='step-2-title'] > p {
+section[aria-labelledby='step-2-title'] > p,
+.empty-state {
   margin-top: 0.75rem;
   padding: 0.8rem 0.95rem;
   border-radius: 12px;

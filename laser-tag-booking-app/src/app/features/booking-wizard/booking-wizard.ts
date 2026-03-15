@@ -4,6 +4,15 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { BookingApiService } from '../../services/booking-api';
 import { CreateBookingRequest, PackageType, TimeSlot } from '../../models/booking.models';
 
+export interface PackageDetails {
+  type: PackageType;
+  name: string;
+  price: string;
+  duration: string;
+  description: string;
+  minPersons?: number;
+}
+
 @Component({
   selector: 'app-booking-wizard',
   standalone: true,
@@ -25,15 +34,65 @@ export class BookingWizard {
   isSubmitting = false;
   successMessage = '';
 
-  readonly packageOptions: Array<{ label: string; value: PackageType }> = [
-    { label: 'S1', value: PackageType.S1 },
-    { label: 'S2', value: PackageType.S2 },
-    { label: 'Premium', value: PackageType.Premium },
-    { label: 'Max', value: PackageType.Max },
-    { label: 'U1', value: PackageType.U1 },
-    { label: 'U2', value: PackageType.U2 },
-    { label: 'U3', value: PackageType.U3 },
-    { label: 'Combat', value: PackageType.Combat }
+  readonly packagesList: PackageDetails[] = [
+    {
+      type: PackageType.S1,
+      name: 'S1',
+      price: '55 PLN',
+      duration: '50 min',
+      description: 'przygotowanie do gry + 30 min gry (2 gry po 15 min) + 250 strzałów',
+      minPersons: 10
+    },
+    {
+      type: PackageType.S2,
+      name: 'S2',
+      price: '65 PLN',
+      duration: '60 min',
+      description: 'przygotowanie do gry + 40 minut gry (2 gry po 20 min) + 250 strzałów'
+    },
+    {
+      type: PackageType.Premium,
+      name: 'Premium',
+      price: '85 PLN',
+      duration: '70 min',
+      description: 'przygotowanie do gry + 50 minut gry (5 gier po 10 minut lub 2 gry po 25 min) + no limit strzałów'
+    },
+    {
+      type: PackageType.Max,
+      name: 'Max',
+      price: '95 PLN',
+      duration: '80 min',
+      description: 'przygotowanie do gry + 60 minut gry (6 gier po 10 minut lub 2 gry po 30 min) + no limit strzałów'
+    },
+    {
+      type: PackageType.U1,
+      name: 'U1',
+      price: '55 PLN',
+      duration: '80 min',
+      description: 'przygotowanie do gry + 30 minut gry (2 gry po 15 min) + 250 strzałów + 30 minut w salce',
+      minPersons: 10
+    },
+    {
+      type: PackageType.U2,
+      name: 'U2',
+      price: '65 PLN',
+      duration: '90 min',
+      description: 'przygotowanie do gry + 40 minut gry (2 gry po 20 min) + 250 strzałów + 30 minut w salce'
+    },
+    {
+      type: PackageType.U3,
+      name: 'U3',
+      price: '85 PLN',
+      duration: '100 min',
+      description: 'przygotowanie do gry + 50 minut gry (5 gier po 10 minut lub 2 gry po 25 min) + no limit strzałów + 30 minut w salce'
+    },
+    {
+      type: PackageType.Combat,
+      name: 'Combat',
+      price: '95 PLN',
+      duration: '110 min',
+      description: 'przygotowanie do gry + 60 minut gry (6 gier po 10 minut lub 2 gry po 30 min) + no limit strzałów + 30 minut w salce'
+    }
   ];
 
   readonly customerForm = this.formBuilder.nonNullable.group({

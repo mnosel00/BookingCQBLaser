@@ -10,13 +10,27 @@
 
   <section *ngIf="currentStep === 1" aria-labelledby="step-1-title">
     <h2 id="step-1-title">Step 1: Choose Package</h2>
+
     <div class="package-grid">
       <button
         type="button"
-        *ngFor="let pkg of packageOptions"
-        (click)="selectPackage(pkg.value)"
+        class="package-card"
+        *ngFor="let pkg of packagesList"
+        [class.selected]="selectedPackage === pkg.type"
+        [attr.aria-pressed]="selectedPackage === pkg.type"
+        (click)="selectPackage(pkg.type)"
       >
-        {{ pkg.label }}
+        <div class="package-card__top">
+          <h3>{{ pkg.name }}</h3>
+          <p class="package-card__price">{{ pkg.price }}</p>
+        </div>
+
+        <p class="package-card__duration">{{ pkg.duration }}</p>
+        <p class="package-card__description">{{ pkg.description }}</p>
+
+        <p class="package-card__badge" *ngIf="pkg.minPersons === 10">
+          Tylko dla grup min. 10 osób
+        </p>
       </button>
     </div>
   </section>
@@ -42,8 +56,9 @@
           </button>
         </li>
       </ul>
+
       <ng-template #noSlots>
-        <p *ngIf="selectedDate">No available slots for the selected date.</p>
+        <p class="empty-state" *ngIf="selectedDate">No available slots for the selected date.</p>
       </ng-template>
     </ng-container>
   </section>
