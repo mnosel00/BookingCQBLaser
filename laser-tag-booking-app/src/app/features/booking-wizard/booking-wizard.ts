@@ -9,7 +9,7 @@ export interface PackageDetails {
   name: string;
   price: string;
   duration: string;
-  description: string;
+  features: string[];
   minPersons?: number;
 }
 
@@ -40,7 +40,11 @@ export class BookingWizard {
       name: 'S1',
       price: '55 PLN',
       duration: '50 min',
-      description: 'przygotowanie do gry + 30 min gry (2 gry po 15 min) + 250 strzałów',
+      features: [
+        'Przygotowanie do gry',
+        '30 min gry (2 gry po 15 min)',
+        '250 strzałów'
+      ],
       minPersons: 10
     },
     {
@@ -48,28 +52,45 @@ export class BookingWizard {
       name: 'S2',
       price: '65 PLN',
       duration: '60 min',
-      description: 'przygotowanie do gry + 40 minut gry (2 gry po 20 min) + 250 strzałów'
+      features: [
+        'Przygotowanie do gry',
+        '40 minut gry (2 gry po 20 min)',
+        '250 strzałów'
+      ]
     },
     {
       type: PackageType.Premium,
       name: 'Premium',
       price: '85 PLN',
       duration: '70 min',
-      description: 'przygotowanie do gry + 50 minut gry (5 gier po 10 minut lub 2 gry po 25 min) + no limit strzałów'
+      features: [
+        'Przygotowanie do gry',
+        '50 minut gry (5 gier po 10 min lub 2 gry po 25 min)',
+        'No limit strzałów'
+      ]
     },
     {
       type: PackageType.Max,
       name: 'Max',
       price: '95 PLN',
       duration: '80 min',
-      description: 'przygotowanie do gry + 60 minut gry (6 gier po 10 minut lub 2 gry po 30 min) + no limit strzałów'
+      features: [
+        'Przygotowanie do gry',
+        '60 minut gry (6 gier po 10 min lub 2 gry po 30 min)',
+        'No limit strzałów'
+      ]
     },
     {
       type: PackageType.U1,
       name: 'U1',
       price: '55 PLN',
       duration: '80 min',
-      description: 'przygotowanie do gry + 30 minut gry (2 gry po 15 min) + 250 strzałów + 30 minut w salce',
+      features: [
+        'Przygotowanie do gry',
+        '30 minut gry (2 gry po 15 min)',
+        '250 strzałów',
+        '30 minut w salce'
+      ],
       minPersons: 10
     },
     {
@@ -77,21 +98,36 @@ export class BookingWizard {
       name: 'U2',
       price: '65 PLN',
       duration: '90 min',
-      description: 'przygotowanie do gry + 40 minut gry (2 gry po 20 min) + 250 strzałów + 30 minut w salce'
+      features: [
+        'Przygotowanie do gry',
+        '40 minut gry (2 gry po 20 min)',
+        '250 strzałów',
+        '30 minut w salce'
+      ]
     },
     {
       type: PackageType.U3,
       name: 'U3',
       price: '85 PLN',
       duration: '100 min',
-      description: 'przygotowanie do gry + 50 minut gry (5 gier po 10 minut lub 2 gry po 25 min) + no limit strzałów + 30 minut w salce'
+      features: [
+        'Przygotowanie do gry',
+        '50 minut gry (5 gier po 10 min lub 2 gry po 25 min)',
+        'No limit strzałów',
+        '30 minut w salce'
+      ]
     },
     {
       type: PackageType.Combat,
       name: 'Combat',
       price: '95 PLN',
       duration: '110 min',
-      description: 'przygotowanie do gry + 60 minut gry (6 gier po 10 minut lub 2 gry po 30 min) + no limit strzałów + 30 minut w salce'
+      features: [
+        'Przygotowanie do gry',
+        '60 minut gry (6 gier po 10 min lub 2 gry po 30 min)',
+        'No limit strzałów',
+        '30 minut w salce'
+      ]
     }
   ];
 

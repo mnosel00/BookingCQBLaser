@@ -26,7 +26,13 @@
         </div>
 
         <p class="package-card__duration">{{ pkg.duration }}</p>
-        <p class="package-card__description">{{ pkg.description }}</p>
+
+        <ul class="package-card__features">
+          <li *ngFor="let feature of pkg.features">
+            <span class="feature-check" aria-hidden="true">✓</span>
+            <span>{{ feature }}</span>
+          </li>
+        </ul>
 
         <p class="package-card__badge" *ngIf="pkg.minPersons === 10">
           Tylko dla grup min. 10 osób

@@ -207,11 +207,37 @@ input.ng-invalid.ng-touched {
   font-size: 0.92rem;
 }
 
-.package-card__description {
+.package-card__features {
+  margin: 0.15rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.38rem;
+}
+
+.package-card__features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
   margin: 0;
-  color: #334155;
-  line-height: 1.4;
+  color: #475569;
   font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.feature-check {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.05rem;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: #ecfdf3;
+  color: #16a34a;
+  border: 1px solid #86efac;
+  font-weight: 900;
+  font-size: 0.74rem;
 }
 
 .package-card__badge {
