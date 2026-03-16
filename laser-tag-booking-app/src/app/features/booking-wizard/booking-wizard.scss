@@ -101,7 +101,7 @@ input[type='number'] {
   padding: 0.72rem 0.9rem;
   font-size: 1rem;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 input[type='date'] {
@@ -122,6 +122,50 @@ input.ng-invalid.ng-touched {
   box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.16);
 }
 
+/* Category toggle */
+.category-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 1.25rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 0.3rem;
+  width: fit-content;
+  margin-inline: auto;
+}
+
+.category-toggle__btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.55rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease;
+  white-space: nowrap;
+}
+
+.category-toggle__btn:hover:not(.active) {
+  color: #334155;
+  background: #e2e8f0;
+}
+
+.category-toggle__btn.active {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.32);
+}
+
+.category-toggle__btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
 /* Step 1 - pricing cards */
 .package-grid {
   display: grid;
@@ -129,7 +173,7 @@ input.ng-invalid.ng-touched {
   gap: 1rem;
 }
 
-@media (min-width: 760px) {
+@media (min-width: 640px) {
   .package-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -365,6 +409,15 @@ button[type='submit']:disabled {
   section {
     padding: 0.9rem;
     border-radius: 14px;
+  }
+
+  .category-toggle {
+    width: 100%;
+  }
+
+  .category-toggle__btn {
+    flex: 1;
+    text-align: center;
   }
 
   button[type='submit'] {

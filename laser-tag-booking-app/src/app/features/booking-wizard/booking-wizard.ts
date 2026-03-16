@@ -10,6 +10,7 @@ export interface PackageDetails {
   price: string;
   duration: string;
   features: string[];
+  category: 'regular' | 'birthday';
   minPersons?: number;
 }
 
@@ -29,6 +30,7 @@ export class BookingWizard {
   selectedDate: string | Date = '';
   availableSlots: TimeSlot[] = [];
   selectedSlot: TimeSlot | null = null;
+  selectedCategory: 'regular' | 'birthday' = 'regular';
 
   isLoadingSlots = false;
   isSubmitting = false;
@@ -40,6 +42,7 @@ export class BookingWizard {
       name: 'S1',
       price: '55 PLN',
       duration: '50 min',
+      category: 'regular',
       features: [
         'Przygotowanie do gry',
         '30 min gry (2 gry po 15 min)',
@@ -52,6 +55,7 @@ export class BookingWizard {
       name: 'S2',
       price: '65 PLN',
       duration: '60 min',
+      category: 'regular',
       features: [
         'Przygotowanie do gry',
         '40 minut gry (2 gry po 20 min)',
@@ -63,6 +67,7 @@ export class BookingWizard {
       name: 'Premium',
       price: '85 PLN',
       duration: '70 min',
+      category: 'regular',
       features: [
         'Przygotowanie do gry',
         '50 minut gry (5 gier po 10 min lub 2 gry po 25 min)',
@@ -74,6 +79,7 @@ export class BookingWizard {
       name: 'Max',
       price: '95 PLN',
       duration: '80 min',
+      category: 'regular',
       features: [
         'Przygotowanie do gry',
         '60 minut gry (6 gier po 10 min lub 2 gry po 30 min)',
@@ -85,6 +91,7 @@ export class BookingWizard {
       name: 'U1',
       price: '55 PLN',
       duration: '80 min',
+      category: 'birthday',
       features: [
         'Przygotowanie do gry',
         '30 minut gry (2 gry po 15 min)',
@@ -98,6 +105,7 @@ export class BookingWizard {
       name: 'U2',
       price: '65 PLN',
       duration: '90 min',
+      category: 'birthday',
       features: [
         'Przygotowanie do gry',
         '40 minut gry (2 gry po 20 min)',
@@ -110,6 +118,7 @@ export class BookingWizard {
       name: 'U3',
       price: '85 PLN',
       duration: '100 min',
+      category: 'birthday',
       features: [
         'Przygotowanie do gry',
         '50 minut gry (5 gier po 10 min lub 2 gry po 25 min)',
@@ -122,6 +131,7 @@ export class BookingWizard {
       name: 'Combat',
       price: '95 PLN',
       duration: '110 min',
+      category: 'birthday',
       features: [
         'Przygotowanie do gry',
         '60 minut gry (6 gier po 10 min lub 2 gry po 30 min)',
@@ -130,6 +140,10 @@ export class BookingWizard {
       ]
     }
   ];
+
+  get filteredPackages(): PackageDetails[] {
+    return this.packagesList.filter(p => p.category === this.selectedCategory);
+  }
 
   readonly customerForm = this.formBuilder.nonNullable.group({
     firstName: ['', [Validators.required]],
@@ -143,6 +157,10 @@ export class BookingWizard {
     return typeof this.selectedDate === 'string'
       ? this.selectedDate
       : this.selectedDate.toISOString().slice(0, 10);
+  }
+
+  setCategory(cat: 'regular' | 'birthday'): void {
+    this.selectedCategory = cat;
   }
 
   selectPackage(pkg: PackageType): void {

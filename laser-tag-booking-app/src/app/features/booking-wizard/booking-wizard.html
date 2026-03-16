@@ -11,11 +11,34 @@
   <section *ngIf="currentStep === 1" aria-labelledby="step-1-title">
     <h2 id="step-1-title">Step 1: Choose Package</h2>
 
+    <div class="category-toggle" role="tablist" aria-label="Package category">
+      <button
+        type="button"
+        role="tab"
+        class="category-toggle__btn"
+        [class.active]="selectedCategory === 'regular'"
+        [attr.aria-selected]="selectedCategory === 'regular'"
+        (click)="setCategory('regular')"
+      >
+        🎯 Pakiety Zwykłe
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="category-toggle__btn"
+        [class.active]="selectedCategory === 'birthday'"
+        [attr.aria-selected]="selectedCategory === 'birthday'"
+        (click)="setCategory('birthday')"
+      >
+        🎂 Pakiety Urodzinowe
+      </button>
+    </div>
+
     <div class="package-grid">
       <button
         type="button"
         class="package-card"
-        *ngFor="let pkg of packagesList"
+        *ngFor="let pkg of filteredPackages"
         [class.selected]="selectedPackage === pkg.type"
         [attr.aria-pressed]="selectedPackage === pkg.type"
         (click)="selectPackage(pkg.type)"
