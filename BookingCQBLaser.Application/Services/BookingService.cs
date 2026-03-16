@@ -10,9 +10,9 @@ namespace BookingCQBLaser.Application.Services;
 public class BookingService : IBookingService
 {
     private const int TurnaroundBufferMinutes = 30;
-    private const int SlotIntervalMinutes = 30;
-    private static readonly TimeOnly ArenaOpenTime = new(10, 0);
-    private static readonly TimeOnly ArenaCloseTime = new(22, 0);
+    private const int SlotIntervalMinutes = 10;
+    private static readonly TimeOnly ArenaOpenTime = new(8, 0);
+    private static readonly TimeOnly LatestStartTime = new(22, 0);
 
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
@@ -41,17 +41,19 @@ public class BookingService : IBookingService
             ArenaOpenTime.Hour, ArenaOpenTime.Minute, 0,
             date.Offset);
 
-        var dayEnd = new DateTimeOffset(
+        var latestStart = new DateTimeOffset(
             date.Year, date.Month, date.Day,
-            ArenaCloseTime.Hour, ArenaCloseTime.Minute, 0,
+            LatestStartTime.Hour, LatestStartTime.Minute, 0,
             date.Offset);
+
+        var dayEnd = dayStart.AddDays(1);
 
         var busyPeriods = await GetCombinedBusyPeriodsAsync(dayStart, dayEnd, cancellationToken);
 
         var availableSlots = new List<TimeSlotDto>();
         var currentSlotStart = dayStart;
 
-        while (currentSlotStart.AddMinutes(totalDurationMinutes) <= dayEnd)
+        while (currentSlotStart <= latestStart)
         {
             var currentSlotEnd = currentSlotStart.AddMinutes(totalDurationMinutes);
 
@@ -72,8 +74,8 @@ public class BookingService : IBookingService
     }
 
     public async Task<Guid> CreateBookingAsync(
-        CreateBookingDto dto,
-        CancellationToken cancellationToken = default)
+    CreateBookingDto dto,
+    CancellationToken cancellationToken = default)
     {
         // Verify slot availability to prevent race conditions
         var availableSlots = await GetAvailableTimeSlotsAsync(dto.StartTime, dto.Package, cancellationToken);
@@ -93,11 +95,14 @@ public class BookingService : IBookingService
             dto.Email,
             dto.Phone);
 
+        var totalBlockedDurationMinutes = dto.Package.GetBaseDurationMinutes() + TurnaroundBufferMinutes;
+
         var booking = new Booking(
             customerInfo,
             dto.ParticipantsCount,
             dto.Package,
-            dto.StartTime);
+            dto.StartTime,
+            totalBlockedDurationMinutes);
 
         await _repository.AddAsync(booking, cancellationToken);
         _logger.LogInformation("Booking {BookingId} saved to database", booking.Id);
@@ -139,10 +144,14 @@ public class BookingService : IBookingService
 
         var busyPeriods = new List<(DateTimeOffset Start, DateTimeOffset End)>();
 
-        // Add local bookings as busy periods
+        // Add local bookings as busy periods ONLY if they haven't been synced to Google Calendar
+        // If they have a Google Event ID, let Google's FreeBusy response dictate if the time is actually blocked
         foreach (var booking in localBookings)
         {
-            busyPeriods.Add((booking.StartTime, booking.EndTime));
+            if (string.IsNullOrEmpty(booking.GoogleCalendarEventId))
+            {
+                busyPeriods.Add((booking.StartTime, booking.EndTime));
+            }
         }
 
         // Add Google Calendar busy periods

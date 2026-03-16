@@ -10,8 +10,6 @@ namespace BookingCQBLaser.Domain.Entities
 {
     public class Booking
     {
-        private const int TurnaroundBufferMinutes = 30;
-
         public Guid Id { get; private set; }
         public CustomerInfo Customer { get; private set; }
         public int ParticipantsCount { get; private set; }
@@ -28,13 +26,14 @@ namespace BookingCQBLaser.Domain.Entities
             CustomerInfo customer,
             int participantsCount,
             PackageType package,
-            DateTimeOffset startTime)
+            DateTimeOffset startTime,
+            int totalBlockedDurationMinutes)
         {
             Id = Guid.NewGuid();
             CreatedAt = DateTimeOffset.UtcNow;
 
             Customer = customer ?? throw new ArgumentNullException(nameof(customer));
-            SetBookingDetails(participantsCount, package, startTime);
+            SetBookingDetails(participantsCount, package, startTime, totalBlockedDurationMinutes);
         }
 
         public void UpdateCustomer(CustomerInfo customer)
@@ -42,26 +41,19 @@ namespace BookingCQBLaser.Domain.Entities
             Customer = customer ?? throw new ArgumentNullException(nameof(customer));
         }
 
-        public void SetBookingDetails(int participantsCount, PackageType package, DateTimeOffset startTime)
+        public void SetBookingDetails(int participantsCount, PackageType package, DateTimeOffset startTime, int totalBlockedDurationMinutes)
         {
             if (participantsCount <= 0) throw new ArgumentException("Participants count must be greater than zero.", nameof(participantsCount));
 
             ParticipantsCount = participantsCount;
             Package = package;
             StartTime = startTime;
-
-            RecalculateEndTime();
+            EndTime = StartTime.AddMinutes(totalBlockedDurationMinutes);
         }
 
         public void UpdateGoogleCalendarEventId(string? eventId)
         {
             GoogleCalendarEventId = eventId;
-        }
-
-        private void RecalculateEndTime()
-        {
-            var duration = Package.GetBaseDurationMinutes();
-            EndTime = StartTime.AddMinutes(duration + TurnaroundBufferMinutes);
         }
     }
 }
