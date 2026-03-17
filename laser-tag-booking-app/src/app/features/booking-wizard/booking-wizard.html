@@ -1,48 +1,50 @@
 <main class="booking-wizard">
+
   <header>
     <h1>Booking Wizard</h1>
-    <p>Step {{ currentStep }} of 3</p>
   </header>
+
+  <div class="progress-bar-wrapper">
+    <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="currentStep" aria-valuemin="1" aria-valuemax="3">
+      <div class="progress-bar__fill" [style.width.%]="progressPercent"></div>
+    </div>
+    <div class="progress-bar__labels">
+      <span [class.active]="currentStep >= 1">1. Pakiet</span>
+      <span [class.active]="currentStep >= 2">2. Termin</span>
+      <span [class.active]="currentStep >= 3">3. Dane</span>
+    </div>
+  </div>
 
   <p *ngIf="successMessage" role="status">
     {{ successMessage }}
   </p>
 
+  <!-- STEP 1 -->
   <section *ngIf="currentStep === 1" aria-labelledby="step-1-title">
-    <h2 id="step-1-title">Step 1: Choose Package</h2>
+    <h2 id="step-1-title">Wybierz pakiet</h2>
 
     <div class="category-toggle" role="tablist" aria-label="Package category">
-      <button
-        type="button"
-        role="tab"
-        class="category-toggle__btn"
+      <button type="button" role="tab" class="category-toggle__btn"
         [class.active]="selectedCategory === 'regular'"
         [attr.aria-selected]="selectedCategory === 'regular'"
-        (click)="setCategory('regular')"
-      >
+        (click)="setCategory('regular')">
         🎯 Pakiety Zwykłe
       </button>
-      <button
-        type="button"
-        role="tab"
-        class="category-toggle__btn"
+      <button type="button" role="tab" class="category-toggle__btn"
         [class.active]="selectedCategory === 'birthday'"
         [attr.aria-selected]="selectedCategory === 'birthday'"
-        (click)="setCategory('birthday')"
-      >
+        (click)="setCategory('birthday')">
         🎂 Pakiety Urodzinowe
       </button>
     </div>
 
     <div class="package-grid">
-      <button
-        type="button"
-        class="package-card"
+      <button type="button" class="package-card"
         *ngFor="let pkg of filteredPackages"
         [class.selected]="selectedPackage === pkg.type"
         [attr.aria-pressed]="selectedPackage === pkg.type"
-        (click)="selectPackage(pkg.type)"
-      >
+        (click)="selectPackage(pkg.type)">
+
         <div class="package-card__top">
           <h3>{{ pkg.name }}</h3>
           <p class="package-card__price">{{ pkg.price }}</p>
@@ -64,10 +66,19 @@
     </div>
   </section>
 
+  <!-- STEP 2 -->
   <section *ngIf="currentStep === 2" aria-labelledby="step-2-title">
-    <h2 id="step-2-title">Step 2: Choose Date and Time Slot</h2>
+    <div class="step-nav">
+      <button type="button" class="btn-back" (click)="previousStep()">Wróć</button>
+      <h2 id="step-2-title">Wybierz termin</h2>
+    </div>
 
-    <label for="bookingDate">Date</label>
+    <div class="selected-package-summary" *ngIf="selectedPackageDetails">
+      <span class="summary-label">Wybrany pakiet:</span>
+      <span class="summary-value">{{ selectedPackageDetails.name }} — {{ selectedPackageDetails.price }} / {{ selectedPackageDetails.duration }}</span>
+    </div>
+
+    <label for="bookingDate">Data</label>
     <input
       id="bookingDate"
       type="date"
@@ -75,7 +86,7 @@
       (change)="onDateChange(($any($event.target)).value)"
     />
 
-    <p *ngIf="isLoadingSlots">Loading slots...</p>
+    <p *ngIf="isLoadingSlots" class="loading-text">Ładowanie slotów...</p>
 
     <ng-container *ngIf="!isLoadingSlots">
       <ul *ngIf="availableSlots.length > 0; else noSlots">
@@ -87,46 +98,72 @@
       </ul>
 
       <ng-template #noSlots>
-        <p class="empty-state" *ngIf="selectedDate">No available slots for the selected date.</p>
+        <p class="empty-state" *ngIf="selectedDate">Brak dostępnych slotów dla wybranej daty.</p>
       </ng-template>
     </ng-container>
   </section>
 
+  <!-- STEP 3 -->
   <section *ngIf="currentStep === 3" aria-labelledby="step-3-title">
-    <h2 id="step-3-title">Step 3: Customer Details</h2>
+    <div class="step-nav">
+      <button type="button" class="btn-back" (click)="previousStep()">Wróć</button>
+      <h2 id="step-3-title">Dane rezerwacji</h2>
+    </div>
 
-    <p>
-      Selected slot:
-      <strong>{{ selectedSlot?.startTime | date:'HH:mm' }} - {{ selectedSlot?.endTime | date:'HH:mm' }}</strong>
-    </p>
+    <div class="selected-package-summary" *ngIf="selectedPackageDetails">
+      <span class="summary-label">Wybrany pakiet:</span>
+      <span class="summary-value">{{ selectedPackageDetails.name }} — {{ selectedPackageDetails.price }} / {{ selectedPackageDetails.duration }}</span>
+      <span class="summary-slot" *ngIf="selectedSlot">
+        🕐 {{ selectedSlot.startTime | date:'HH:mm' }} – {{ selectedSlot.endTime | date:'HH:mm' }}
+      </span>
+    </div>
 
     <form [formGroup]="customerForm" (ngSubmit)="submitBooking()" novalidate>
-      <div>
-        <label for="firstName">First Name</label>
+
+      <div class="form-field">
+        <label for="firstName">Imię</label>
         <input id="firstName" type="text" formControlName="firstName" />
+        <small class="error-text" *ngIf="f('firstName')?.touched && f('firstName')?.hasError('required')">Imię jest wymagane.</small>
+        <small class="error-text" *ngIf="f('firstName')?.touched && f('firstName')?.hasError('pattern')">Imię zawiera niedozwolone znaki.</small>
       </div>
 
-      <div>
-        <label for="lastName">Last Name</label>
+      <div class="form-field">
+        <label for="lastName">Nazwisko</label>
         <input id="lastName" type="text" formControlName="lastName" />
+        <small class="error-text" *ngIf="f('lastName')?.touched && f('lastName')?.hasError('required')">Nazwisko jest wymagane.</small>
+        <small class="error-text" *ngIf="f('lastName')?.touched && f('lastName')?.hasError('pattern')">Nazwisko zawiera niedozwolone znaki.</small>
       </div>
 
-      <div>
+      <div class="form-field">
         <label for="email">Email</label>
         <input id="email" type="email" formControlName="email" />
+        <small class="error-text" *ngIf="f('email')?.touched && f('email')?.hasError('required')">Email jest wymagany.</small>
+        <small class="error-text" *ngIf="f('email')?.touched && f('email')?.hasError('email')">Niepoprawny format email.</small>
       </div>
 
-      <div>
-        <label for="phone">Phone</label>
-        <input id="phone" type="tel" formControlName="phone" />
+      <div class="form-field">
+        <label for="phone">Telefon</label>
+        <input id="phone" type="tel" formControlName="phone" placeholder="+48123456789" />
+        <small class="error-text" *ngIf="f('phone')?.touched && f('phone')?.hasError('required')">Numer telefonu jest wymagany.</small>
+        <small class="error-text" *ngIf="f('phone')?.touched && f('phone')?.hasError('pattern')">Proszę podać poprawny numer +48123456789</small>
       </div>
 
-      <div>
-        <label for="participantsCount">Participants</label>
+      <div class="form-field">
+        <label for="participantsCount">Liczba uczestników</label>
         <input id="participantsCount" type="number" min="1" formControlName="participantsCount" />
+        <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('required')">Liczba uczestników jest wymagana.</small>
+        <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('min')">
+          Minimalna liczba uczestników dla tego pakietu wynosi {{ f('participantsCount')?.getError('min')?.min }}.
+        </small>
+        <small class="error-text error-text--important" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('max')">
+          W celu rezerwacji dla grupy powyżej 26 osób prosimy o dokonywanie rezerwacji telefonicznie pod numerem +48 509 595 199.
+        </small>
       </div>
 
-      <button type="submit" [disabled]="isSubmitting">Confirm Booking</button>
+      <button type="submit" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'Wysyłanie...' : 'Potwierdź rezerwację' }}
+      </button>
+
     </form>
   </section>
 </main>
