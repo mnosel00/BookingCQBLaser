@@ -11,7 +11,7 @@ import { CreateBookingRequest, PackageType, TimeSlot } from '../../models/bookin
 export interface PackageDetails {
   type: PackageType;
   name: string;
-  price: string;
+  price: number;
   duration: string;
   features: string[];
   category: 'regular' | 'birthday';
@@ -19,7 +19,7 @@ export interface PackageDetails {
 }
 
 const NAME_PATTERN = /^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]+$/;
-const PHONE_PATTERN = /^\+\d{2,3}[\s\-]?\d{9}$/;
+const PHONE_PATTERN = /^\+\d{2,3}(?:[\s-]?\d){9}$/;
 
 @Component({
   selector: 'app-booking-wizard',
@@ -42,12 +42,14 @@ export class BookingWizard {
   isLoadingSlots = false;
   isSubmitting = false;
   successMessage = '';
+  showTermsModal = false;
+  hasOpenedTerms = false;
 
   readonly packagesList: PackageDetails[] = [
     {
       type: PackageType.S1,
       name: 'S1',
-      price: '55 PLN',
+      price: 55,
       duration: '50 min',
       category: 'regular',
       features: ['Przygotowanie do gry', '30 min gry (2 gry po 15 min)', '250 strzałów'],
@@ -56,7 +58,7 @@ export class BookingWizard {
     {
       type: PackageType.S2,
       name: 'S2',
-      price: '65 PLN',
+      price: 65,
       duration: '60 min',
       category: 'regular',
       features: ['Przygotowanie do gry', '40 minut gry (2 gry po 20 min)', '250 strzałów']
@@ -64,7 +66,7 @@ export class BookingWizard {
     {
       type: PackageType.Premium,
       name: 'Premium',
-      price: '85 PLN',
+      price: 85,
       duration: '70 min',
       category: 'regular',
       features: ['Przygotowanie do gry', '50 minut gry (5 gier po 10 min lub 2 gry po 25 min)', 'No limit strzałów']
@@ -72,7 +74,7 @@ export class BookingWizard {
     {
       type: PackageType.Max,
       name: 'Max',
-      price: '95 PLN',
+      price: 95,
       duration: '80 min',
       category: 'regular',
       features: ['Przygotowanie do gry', '60 minut gry (6 gier po 10 min lub 2 gry po 30 min)', 'No limit strzałów']
@@ -80,7 +82,7 @@ export class BookingWizard {
     {
       type: PackageType.U1,
       name: 'U1',
-      price: '55 PLN',
+      price: 55,
       duration: '80 min',
       category: 'birthday',
       features: ['Przygotowanie do gry', '30 minut gry (2 gry po 15 min)', '250 strzałów', '30 minut w salce'],
@@ -89,7 +91,7 @@ export class BookingWizard {
     {
       type: PackageType.U2,
       name: 'U2',
-      price: '65 PLN',
+      price: 65,
       duration: '90 min',
       category: 'birthday',
       features: ['Przygotowanie do gry', '40 minut gry (2 gry po 20 min)', '250 strzałów', '30 minut w salce']
@@ -97,7 +99,7 @@ export class BookingWizard {
     {
       type: PackageType.U3,
       name: 'U3',
-      price: '85 PLN',
+      price: 85,
       duration: '100 min',
       category: 'birthday',
       features: ['Przygotowanie do gry', '50 minut gry (5 gier po 10 min lub 2 gry po 25 min)', 'No limit strzałów', '30 minut w salce']
@@ -105,7 +107,7 @@ export class BookingWizard {
     {
       type: PackageType.Combat,
       name: 'Combat',
-      price: '95 PLN',
+      price: 95,
       duration: '110 min',
       category: 'birthday',
       features: ['Przygotowanie do gry', '60 minut gry (6 gier po 10 min lub 2 gry po 30 min)', 'No limit strzałów', '30 minut w salce']
@@ -114,11 +116,17 @@ export class BookingWizard {
 
   readonly customerForm = this.formBuilder.nonNullable.group({
     firstName: ['', [Validators.required, Validators.pattern(NAME_PATTERN)]],
-    lastName:  ['', [Validators.required, Validators.pattern(NAME_PATTERN)]],
+    lastName: ['', [Validators.required, Validators.pattern(NAME_PATTERN)]],
     email: ['', [Validators.required, Validators.email]],
     phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN)]],
-    participantsCount: [1, [Validators.required, Validators.min(8), Validators.max(26)]]
+    participantsCount: [1, [Validators.required, Validators.min(8), Validators.max(26)]],
+    acceptTerms: [false, Validators.requiredTrue],
+    acceptDeposit: [false, Validators.requiredTrue]
   });
+
+  constructor() {
+    this.customerForm.get('acceptTerms')?.disable();
+  }
 
   get filteredPackages(): PackageDetails[] {
     return this.packagesList.filter(p => p.category === this.selectedCategory);
@@ -138,6 +146,22 @@ export class BookingWizard {
     return (this.currentStep / 3) * 100;
   }
 
+  get numericPrice(): number {
+    return this.selectedPackageDetails?.price ?? 0;
+  }
+
+  get totalCost(): number {
+    const participants = Number(this.customerForm.get('participantsCount')?.value ?? 0);
+    if (!Number.isFinite(participants) || participants <= 0) {
+      return 0;
+    }
+    return this.numericPrice * participants;
+  }
+
+  get remainingBalance(): number {
+    return Math.max(0, this.totalCost - 300);
+  }
+
   f(name: string) {
     return this.customerForm.get(name);
   }
@@ -150,6 +174,16 @@ export class BookingWizard {
     if (this.currentStep > 1) {
       this.currentStep--;
     }
+  }
+
+  openTerms(): void {
+    this.showTermsModal = true;
+    this.hasOpenedTerms = true;
+    this.customerForm.get('acceptTerms')?.enable();
+  }
+
+  closeTerms(): void {
+    this.showTermsModal = false;
   }
 
   selectPackage(pkg: PackageType): void {
@@ -191,7 +225,7 @@ export class BookingWizard {
   }
 
   submitBooking(): void {
-    if (this.customerForm.invalid || this.selectedPackage === null || this.selectedSlot === null) {
+    if (!this.hasOpenedTerms || this.customerForm.invalid || this.selectedPackage === null || this.selectedSlot === null) {
       this.customerForm.markAllAsTouched();
       return;
     }
@@ -219,7 +253,17 @@ export class BookingWizard {
         this.selectedDate = '';
         this.availableSlots = [];
         this.selectedSlot = null;
-        this.customerForm.reset({ firstName: '', lastName: '', email: '', phone: '', participantsCount: 1 });
+        this.customerForm.reset({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          participantsCount: 1,
+          acceptTerms: false,
+          acceptDeposit: false
+        });
+        this.hasOpenedTerms = false;
+        this.customerForm.get('acceptTerms')?.disable();
       },
       error: () => { this.isSubmitting = false; window.alert('Booking failed. Please try again.'); }
     });

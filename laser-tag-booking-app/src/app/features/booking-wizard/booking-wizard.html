@@ -47,7 +47,7 @@
 
         <div class="package-card__top">
           <h3>{{ pkg.name }}</h3>
-          <p class="package-card__price">{{ pkg.price }}</p>
+          <p class="package-card__price">{{ pkg.price }} PLN</p>
         </div>
 
         <p class="package-card__duration">{{ pkg.duration }}</p>
@@ -75,7 +75,7 @@
 
     <div class="selected-package-summary" *ngIf="selectedPackageDetails">
       <span class="summary-label">Wybrany pakiet:</span>
-      <span class="summary-value">{{ selectedPackageDetails.name }} — {{ selectedPackageDetails.price }} / {{ selectedPackageDetails.duration }}</span>
+      <span class="summary-value">{{ selectedPackageDetails.name }} — {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
     </div>
 
     <label for="bookingDate">Data</label>
@@ -112,7 +112,7 @@
 
     <div class="selected-package-summary" *ngIf="selectedPackageDetails">
       <span class="summary-label">Wybrany pakiet:</span>
-      <span class="summary-value">{{ selectedPackageDetails.name }} — {{ selectedPackageDetails.price }} / {{ selectedPackageDetails.duration }}</span>
+      <span class="summary-value">{{ selectedPackageDetails.name }} — {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
       <span class="summary-slot" *ngIf="selectedSlot">
         🕐 {{ selectedSlot.startTime | date:'HH:mm' }} – {{ selectedSlot.endTime | date:'HH:mm' }}
       </span>
@@ -160,10 +160,84 @@
         </small>
       </div>
 
-      <button type="submit" [disabled]="isSubmitting">
-        {{ isSubmitting ? 'Wysyłanie...' : 'Potwierdź rezerwację' }}
+      <div class="booking-cost-summary">
+        <div class="booking-cost-summary__row">
+          <span>Suma:</span>
+          <strong>{{ totalCost }} PLN</strong>
+        </div>
+        <div class="booking-cost-summary__row">
+          <span>Zadatek:</span>
+          <strong>300 PLN</strong>
+        </div>
+        <div class="booking-cost-summary__row booking-cost-summary__row--final">
+          <span>Do zapłaty na miejscu:</span>
+          <strong>{{ remainingBalance }} PLN</strong>
+        </div>
+      </div>
+
+      <div class="checkbox-group">
+        <label class="checkbox-item" for="acceptTerms" [class.disabled-checkbox]="!hasOpenedTerms">
+          <input id="acceptTerms" type="checkbox" formControlName="acceptTerms" />
+          <span>
+            Zapoznałem się z
+            <a
+              href=""
+              class="terms-link"
+              (click)="$event.preventDefault(); $event.stopPropagation(); openTerms()"
+            >
+              Regulaminem
+            </a>
+          </span>
+        </label>
+        @if (!hasOpenedTerms) {
+          <small class="hint-text">* Kliknij w regulamin, aby odblokować</small>
+        }
+        <small class="error-text" *ngIf="f('acceptTerms')?.touched && f('acceptTerms')?.hasError('required')">
+          Akceptacja regulaminu jest wymagana.
+        </small>
+      </div>
+
+      <div class="checkbox-group">
+        <label class="checkbox-item" for="acceptDeposit">
+          <input id="acceptDeposit" type="checkbox" formControlName="acceptDeposit" />
+          <span>Potwierdzenie rezerwacji wiąże się z obowiązkiem zapłaty zadatku 300 PLN</span>
+        </label>
+        <small class="error-text" *ngIf="f('acceptDeposit')?.touched && f('acceptDeposit')?.hasError('required')">
+          Potwierdzenie zgody na wpłate zadatku jest wymagane.
+        </small>
+      </div>
+
+      <button type="submit" [disabled]="customerForm.invalid || !hasOpenedTerms">
+        {{ isSubmitting ? 'Wysyłanie...' : 'Zapłać zadatek i potwierdź rezerwację.' }}
       </button>
 
     </form>
   </section>
 </main>
+
+@if (showTermsModal) {
+  <div class="modal-overlay" (click)="closeTerms()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="terms-container">
+        <h3>Regulamin Rezerwacji i Uczestnictwa</h3>
+        <ul>
+          <li><strong>Wiek uczestników:</strong> Minimalny wiek uczestników to 10 lat.</li>
+          <li><strong>Zadatek:</strong> Rezerwacja terminu jest możliwa po wpłacie zadatku w wysokości 300 PLN, który jest <strong>bezzwrotny</strong>.</li>
+          <li><strong>Płatność na miejscu:</strong> Pozostała część kwoty do dopłaty na miejscu jest przyjmowana <strong>TYLKO GOTÓWKĄ</strong>, z bezwzględnym uwzględnieniem zadeklarowanej przy rezerwacji liczby uczestników.</li>
+          <li><strong>Punktualność:</strong> Prosimy o przybycie <strong>dokładnie na zarezerwowaną godzinę</strong> – nie za wcześnie (ze względu na trwające gry innych grup) i nie za późno. Spóźnienie może skutkować proporcjonalnym skróceniem czasu gry.</li>          <li><strong>Trzeźwość i Bezpieczeństwo:</strong> Osoby pod wpływem alkoholu lub innych substancji odurzających nie będą wpuszczane na teren obiektu. W przypadku stwierdzenia takiego stanu, rezerwacja zostanie anulowana bez możliwości zwrotu zadatku.</li>
+          <li><strong>Osoby niepełnoletnie:</strong> W przypadku uczestnictwa osób niepełnoletnich będących pod opieką opiekuna, prosimy o podpisanie i przyniesienie w dniu imprezy poniższego oświadczenia:
+            <ul>
+              <li><a href="https://comboarena.pl/wp-content/uploads/oswiadczenieopiekunagrupy.pdf" target="_blank">Oświadczenie opiekuna grupy (PDF)</a></li>
+            </ul>
+          </li>
+          <li><strong>Dokumenty dodatkowe:</strong> Ewentualne zgody od rodziców:
+            <ul>
+              <li><a href="https://comboarena.pl/wp-content/uploads/zgodarodzica.pdf" target="_blank">Zgoda rodzica (PDF)</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+      <button type="button" class="modal-close-btn" (click)="closeTerms()">Zamknij</button>
+    </div>
+  </div>
+}

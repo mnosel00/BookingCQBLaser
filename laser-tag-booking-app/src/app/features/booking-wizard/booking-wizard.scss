@@ -59,7 +59,7 @@ h1 {
 
 /* Progress bar */
 .progress-bar-wrapper {
-  margin-bottom: 0.5rem;
+  margin-bottom: 2rem;
 }
 
 .progress-bar {
@@ -499,6 +499,93 @@ form {
   flex-direction: column;
 }
 
+.booking-cost-summary {
+  width: 100%;
+  margin: 0 0 1.25rem;
+  padding: 0.95rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+
+.booking-cost-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+  color: #334155;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  strong {
+    font-weight: 700;
+    color: #1e293b;
+  }
+}
+
+.booking-cost-summary__row--final {
+  margin-top: 0.35rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed #bfdbfe;
+
+  span,
+  strong {
+    font-weight: 800;
+    color: #1d4ed8;
+  }
+
+  strong {
+    font-size: 1.08rem;
+  }
+}
+
+.checkbox-group {
+  width: 100%;
+  margin-bottom: 1rem;
+
+  .error-text {
+    margin-top: 0.4rem;
+    margin-left: 1.75rem;
+  }
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  cursor: pointer;
+  color: #334155;
+  line-height: 1.35;
+
+  input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--primary);
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+
+  span {
+    font-size: 0.92rem;
+  }
+}
+
+.terms-link {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  &:hover {
+    color: #4338ca;
+  }
+}
+
 button[type='submit'] {
   margin-top: 0.35rem;
   justify-self: start;
@@ -529,6 +616,67 @@ button[type='submit'] {
     opacity: 0.6;
     cursor: not-allowed;
     box-shadow: none;
+  }
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+
+  h3 {
+    margin-top: 0;
+    margin-bottom: 0.8rem;
+    color: #0f172a;
+  }
+
+  p {
+    margin: 0 0 1.25rem;
+    color: #334155;
+    line-height: 1.55;
+  }
+}
+
+.modal-close-btn {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #1f2937;
+  border-radius: 10px;
+  padding: 0.55rem 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+
+  &:hover {
+    border-color: var(--primary);
+    background: #eef2ff;
+    color: var(--primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--ring);
   }
 }
 
@@ -569,4 +717,44 @@ button[type='submit'] {
   input[type='date'] {
     max-width: 100%;
   }
+
+  .checkbox-group .error-text {
+    margin-left: 0;
+  }
+}
+
+.terms-container ul {
+  line-height: 1.6;
+  padding-left: 1.5rem;
+}
+
+.terms-container li {
+  margin-bottom: 0.75rem;
+}
+
+.terms-container a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+
+.terms-container a:hover {
+  color: #4338ca;
+}
+
+.disabled-checkbox {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none; /* Prevents clicking the label text to bypass */
+
+  a {
+    pointer-events: auto; /* Keeps the link clickable */
+  }
+}
+
+.hint-text {
+  color: #888;
+  font-size: 0.8rem;
+  margin-left: 0.5rem;
 }
