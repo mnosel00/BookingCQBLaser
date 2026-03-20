@@ -190,7 +190,7 @@
           </span>
         </label>
         @if (!hasOpenedTerms) {
-          <small class="hint-text">* Kliknij w regulamin, aby odblokować</small>
+          <small class="hint-text">* Kliknij w regulamin, aby przejść dalej</small>
         }
         <small class="error-text" *ngIf="f('acceptTerms')?.touched && f('acceptTerms')?.hasError('required')">
           Akceptacja regulaminu jest wymagana.
@@ -204,6 +204,16 @@
         </label>
         <small class="error-text" *ngIf="f('acceptDeposit')?.touched && f('acceptDeposit')?.hasError('required')">
           Potwierdzenie zgody na wpłate zadatku jest wymagane.
+        </small>
+      </div>
+
+      <div class="checkbox-group">
+        <label class="checkbox-item" for="acceptGDPR">
+          <input id="acceptGDPR" type="checkbox" formControlName="acceptGDPR" />
+          <span>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji.</span>
+        </label>
+        <small class="error-text" *ngIf="f('acceptGDPR')?.touched && f('acceptGDPR')?.hasError('required')">
+          Zgoda na przetwarzanie danych osobowych jest wymagana.
         </small>
       </div>
 
@@ -222,8 +232,14 @@
         <h3>Regulamin Rezerwacji i Uczestnictwa</h3>
         <ul>
           <li><strong>Wiek uczestników:</strong> Minimalny wiek uczestników to 10 lat.</li>
+          <li><strong>Minimalna liczba uczestników:</strong>
+            <ul>
+              <li><strong>Minimum 10 osób:</strong> dla pakietów S1 oraz U1.</li>
+              <li><strong>Minimum 8 osób:</strong> dla pozostałych pakietów (S2, U2, Premium, U3, MAX, Combat).</li>
+            </ul>
+          </li>          
           <li><strong>Zadatek:</strong> Rezerwacja terminu jest możliwa po wpłacie zadatku w wysokości 300 PLN, który jest <strong>bezzwrotny</strong>.</li>
-          <li><strong>Płatność na miejscu:</strong> Pozostała część kwoty do dopłaty na miejscu jest przyjmowana <strong>TYLKO GOTÓWKĄ</strong>, z bezwzględnym uwzględnieniem zadeklarowanej przy rezerwacji liczby uczestników.</li>
+          <li><strong>Płatność na miejscu:</strong> Pozostała część kwoty do dopłaty na miejscu jest przyjmowana <strong>TYLKO GOTÓWKĄ</strong>, z uwzględnieniem zadeklarowanej przy rezerwacji liczby uczestników(-2 osoby).</li>
           <li><strong>Punktualność:</strong> Prosimy o przybycie <strong>dokładnie na zarezerwowaną godzinę</strong> – nie za wcześnie (ze względu na trwające gry innych grup) i nie za późno. Spóźnienie może skutkować proporcjonalnym skróceniem czasu gry.</li>          <li><strong>Trzeźwość i Bezpieczeństwo:</strong> Osoby pod wpływem alkoholu lub innych substancji odurzających nie będą wpuszczane na teren obiektu. W przypadku stwierdzenia takiego stanu, rezerwacja zostanie anulowana bez możliwości zwrotu zadatku.</li>
           <li><strong>Osoby niepełnoletnie:</strong> W przypadku uczestnictwa osób niepełnoletnich będących pod opieką opiekuna, prosimy o podpisanie i przyniesienie w dniu imprezy poniższego oświadczenia:
             <ul>

@@ -121,7 +121,8 @@ export class BookingWizard {
     phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN)]],
     participantsCount: [1, [Validators.required, Validators.min(8), Validators.max(26)]],
     acceptTerms: [false, Validators.requiredTrue],
-    acceptDeposit: [false, Validators.requiredTrue]
+    acceptDeposit: [false, Validators.requiredTrue],
+    acceptGDPR: [false, Validators.requiredTrue]
   });
 
   constructor() {
