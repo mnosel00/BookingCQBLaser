@@ -502,43 +502,55 @@ form {
 .booking-cost-summary {
   width: 100%;
   margin: 0 0 1.25rem;
-  padding: 0.95rem 1rem;
-  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
   border: 1px solid #dbeafe;
-  background: #f8fbff;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f5ff 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .booking-cost-summary__row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.45rem;
   color: #334155;
+  font-size: 0.95rem;
 
   &:last-child {
     margin-bottom: 0;
   }
 
   strong {
-    font-weight: 700;
-    color: #1e293b;
+    font-weight: 800;
+    color: #0f172a;
+    white-space: nowrap;
+  }
+}
+
+.booking-cost-summary__divider {
+  border: 0;
+  border-top: 1px dashed #cbd5e1;
+  margin: 0.7rem 0 0.8rem;
+}
+
+.booking-cost-summary__row--now {
+  font-size: 1.03rem;
+  color: var(--primary);
+
+  strong {
+    color: var(--primary);
+    font-size: 1.1rem;
   }
 }
 
 .booking-cost-summary__row--final {
-  margin-top: 0.35rem;
-  padding-top: 0.55rem;
-  border-top: 1px dashed #bfdbfe;
-
-  span,
-  strong {
-    font-weight: 800;
-    color: #1d4ed8;
-  }
+  font-size: 0.98rem;
+  color: #0f766e;
 
   strong {
-    font-size: 1.08rem;
+    color: #0f766e;
   }
 }
 

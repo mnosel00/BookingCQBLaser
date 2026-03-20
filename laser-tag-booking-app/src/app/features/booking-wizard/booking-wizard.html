@@ -160,17 +160,29 @@
         </small>
       </div>
 
+      <!-- CHANGED: financial summary (receipt style, no duplicate section) -->
       <div class="booking-cost-summary">
         <div class="booking-cost-summary__row">
-          <span>Suma:</span>
+          <span>Suma za pakiety:</span>
           <strong>{{ totalCost }} PLN</strong>
         </div>
         <div class="booking-cost-summary__row">
           <span>Zadatek:</span>
-          <strong>300 PLN</strong>
+          <strong>{{ depositAmount }} PLN</strong>
+        </div>
+        <div class="booking-cost-summary__row">
+          <span>Koszt obsługi rezerwacji:</span>
+          <strong>{{ serviceFee }} PLN</strong>
+        </div>
+
+        <hr class="booking-cost-summary__divider" />
+
+        <div class="booking-cost-summary__row booking-cost-summary__row--now">
+          <span><strong>Do zapłaty TERAZ:</strong></span>
+          <strong>{{ totalToPayOnline }} PLN</strong>
         </div>
         <div class="booking-cost-summary__row booking-cost-summary__row--final">
-          <span>Do zapłaty na miejscu:</span>
+          <span><strong>Do dopłaty na miejscu (gotówką):</strong></span>
           <strong>{{ remainingBalance }} PLN</strong>
         </div>
       </div>

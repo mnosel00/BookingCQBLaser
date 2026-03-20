@@ -159,8 +159,24 @@ export class BookingWizard {
     return this.numericPrice * participants;
   }
 
+  // CHANGED: fixed billing amounts
+  get depositAmount(): number {
+    return 300;
+  }
+
+  // CHANGED: fixed service fee
+  get serviceFee(): number {
+    return 4;
+  }
+
+  // CHANGED: amount paid online now (always 304 PLN)
+  get totalToPayOnline(): number {
+    return this.depositAmount + this.serviceFee;
+  }
+
+  // CHANGED: service fee does not reduce on-site balance
   get remainingBalance(): number {
-    return Math.max(0, this.totalCost - 300);
+    return Math.max(0, this.totalCost - this.depositAmount);
   }
 
   f(name: string) {
@@ -261,7 +277,8 @@ export class BookingWizard {
           phone: '',
           participantsCount: 1,
           acceptTerms: false,
-          acceptDeposit: false
+          acceptDeposit: false,
+          acceptGDPR: false // CHANGED: keep GDPR state reset
         });
         this.hasOpenedTerms = false;
         this.customerForm.get('acceptTerms')?.disable();
