@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { TimeSlot, CreateBookingRequest, PackageType } from '../models/booking.models';
 
@@ -8,12 +8,21 @@ import { TimeSlot, CreateBookingRequest, PackageType } from '../models/booking.m
 })
 export class BookingApiService {
   private readonly httpClient = inject(HttpClient);
-  private readonly apiUrl = 'https://nontumultuous-rosamaria-discernably.ngrok-free.dev';
+  
+  private readonly apiUrl = 'https://nontumultuous-rosamaria-discernably.ngrok-free.dev/api/bookings';
+
+  private getHeaders() {
+    return new HttpHeaders({
+      'ngrok-skip-browser-warning': 'true'
+    });
+  }
 
   getAvailableSlots(date: string, packageType: PackageType): Observable<TimeSlot[]> {
-    const url = `${this.apiUrl}/available-slots?date=${encodeURIComponent(date)}&package=${packageType}`;
-    return this.httpClient.get<TimeSlot[]>(url);
-  }
+  const headers = new HttpHeaders().set('ngrok-skip-browser-warning', 'true');
+  const url = `${this.apiUrl}/available-slots?date=${encodeURIComponent(date)}&package=${packageType}`;
+  
+  return this.httpClient.get<TimeSlot[]>(url, { headers });
+}
 
   createBooking(request: CreateBookingRequest): Observable<{ bookingId: string }> {
     return this.httpClient.post<{ bookingId: string }>(this.apiUrl, request);
