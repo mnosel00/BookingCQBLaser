@@ -29,7 +29,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AngularApp", policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.AllowAnyOrigin()  // Pozwala na KAŻDY adres (Netlify, localhost, telefon, itp.)
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
