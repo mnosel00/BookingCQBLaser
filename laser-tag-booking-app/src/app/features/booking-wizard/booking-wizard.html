@@ -75,7 +75,7 @@
 
     <div class="selected-package-summary" *ngIf="selectedPackageDetails">
       <span class="summary-label">Wybrany pakiet:</span>
-      <span class="summary-value">{{ selectedPackageDetails.name }} — {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
+      <span class="summary-value">{{ selectedPackageDetails.name }} - {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
     </div>
 
     <label for="bookingDate">Data</label>
@@ -112,9 +112,9 @@
 
     <div class="selected-package-summary" *ngIf="selectedPackageDetails">
       <span class="summary-label">Wybrany pakiet:</span>
-      <span class="summary-value">{{ selectedPackageDetails.name }} — {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
+      <span class="summary-value">{{ selectedPackageDetails.name }} - {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
       <span class="summary-slot" *ngIf="selectedSlot">
-        🕐 {{ selectedSlot.startTime | date:'HH:mm' }} – {{ selectedSlot.endTime | date:'HH:mm' }}
+        📅 {{ selectedDate | date:'dd.MM.yyyy' }} 🕐 {{ selectedSlot.startTime | date:'HH:mm' }} – {{ selectedSlot.endTime | date:'HH:mm' }}
       </span>
     </div>
 
