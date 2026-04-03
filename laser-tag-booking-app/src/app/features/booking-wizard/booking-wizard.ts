@@ -121,8 +121,7 @@ export class BookingWizard {
     phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN)]],
     participantsCount: [1, [Validators.required, Validators.min(8), Validators.max(26)]],
     acceptTerms: [false, Validators.requiredTrue],
-    acceptDeposit: [false, Validators.requiredTrue],
-    acceptGDPR: [false, Validators.requiredTrue]
+    acceptLegal: [false, Validators.requiredTrue]
   });
 
   constructor() {
@@ -277,8 +276,7 @@ export class BookingWizard {
           phone: '',
           participantsCount: 1,
           acceptTerms: false,
-          acceptDeposit: false,
-          acceptGDPR: false // CHANGED: keep GDPR state reset
+          acceptLegal: false
         });
         this.hasOpenedTerms = false;
         this.customerForm.get('acceptTerms')?.disable();

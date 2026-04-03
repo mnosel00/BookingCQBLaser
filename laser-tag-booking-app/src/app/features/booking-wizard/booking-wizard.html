@@ -163,7 +163,7 @@
       <!-- CHANGED: financial summary (receipt style, no duplicate section) -->
       <div class="booking-cost-summary">
         <div class="booking-cost-summary__row">
-          <span>Suma za pakiety:</span>
+          <span>Suma za pakiet:</span>
           <strong>{{ totalCost }} PLN</strong>
         </div>
         <div class="booking-cost-summary__row">
@@ -197,12 +197,12 @@
               class="terms-link"
               (click)="$event.preventDefault(); $event.stopPropagation(); openTerms()"
             >
-              Regulaminem
+              Ogólnymi zasadami uczestnictwa i rezerwacji
             </a>
           </span>
         </label>
         @if (!hasOpenedTerms) {
-          <small class="hint-text">* Kliknij w regulamin, aby przejść dalej</small>
+          <small class="hint-text">* Kliknij w zasady, aby przejść dalej</small>
         }
         <small class="error-text" *ngIf="f('acceptTerms')?.touched && f('acceptTerms')?.hasError('required')">
           Akceptacja regulaminu jest wymagana.
@@ -210,22 +210,16 @@
       </div>
 
       <div class="checkbox-group">
-        <label class="checkbox-item" for="acceptDeposit">
-          <input id="acceptDeposit" type="checkbox" formControlName="acceptDeposit" />
-          <span>Potwierdzenie rezerwacji wiąże się z obowiązkiem zapłaty zadatku 300 PLN</span>
+        <label class="checkbox-item" for="acceptLegal">
+          <input id="acceptLegal" type="checkbox" formControlName="acceptLegal" />
+          <span>
+            Zapoznałem się z
+            <a href="https://comboarena.pl/regulamin/" target="_blank">Regulaminem</a> i
+            <a href="https://comboarena.pl/polityka-prywatnosci/" target="_blank">Polityką Prywatności</a>
+          </span>
         </label>
-        <small class="error-text" *ngIf="f('acceptDeposit')?.touched && f('acceptDeposit')?.hasError('required')">
-          Potwierdzenie zgody na wpłate zadatku jest wymagane.
-        </small>
-      </div>
-
-      <div class="checkbox-group">
-        <label class="checkbox-item" for="acceptGDPR">
-          <input id="acceptGDPR" type="checkbox" formControlName="acceptGDPR" />
-          <span>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji.</span>
-        </label>
-        <small class="error-text" *ngIf="f('acceptGDPR')?.touched && f('acceptGDPR')?.hasError('required')">
-          Zgoda na przetwarzanie danych osobowych jest wymagana.
+        <small class="error-text" *ngIf="f('acceptLegal')?.touched && f('acceptLegal')?.hasError('required')">
+          Akceptacja regulaminu i polityki prywatności jest wymagana.
         </small>
       </div>
 
@@ -241,7 +235,7 @@
   <div class="modal-overlay" (click)="closeTerms()">
     <div class="modal-content" (click)="$event.stopPropagation()">
       <div class="terms-container">
-        <h3>Regulamin Rezerwacji i Uczestnictwa</h3>
+        <h3>Ogólne zasady uczestnictwa i rezerwacji</h3>
         <ul>
           <li><strong>Wiek uczestników:</strong> Minimalny wiek uczestników to 10 lat.</li>
           <li><strong>Minimalna liczba uczestników:</strong>
