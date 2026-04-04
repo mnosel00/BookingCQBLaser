@@ -535,3 +535,46 @@ button[type='submit'] {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
   -webkit-overflow-scrolling: touch; 
 }
+
+/* Modal Close Button */
+.modal-close-btn {
+  appearance: none;
+  display: block;
+  width: 100%;
+  margin-top: 1.5rem;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 12px;
+  padding: 0.85rem 1.2rem;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05);
+
+  @media (min-width: 480px) {
+    width: auto;
+    min-width: 150px;
+    margin-left: auto; /* Aligns button to the right on larger screens */
+  }
+
+  &:hover {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+    color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--ring);
+  }
+}

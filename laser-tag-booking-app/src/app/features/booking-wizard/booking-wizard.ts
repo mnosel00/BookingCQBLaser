@@ -19,7 +19,7 @@ export interface PackageDetails {
 }
 
 const NAME_PATTERN = /^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]+$/;
-const PHONE_PATTERN = /^\+\d{2,3}(?:[\s-]?\d){9}$/;
+const PHONE_PATTERN = /^\d{9}$/;
 
 @Component({
   selector: 'app-booking-wizard',
@@ -263,7 +263,7 @@ export class BookingWizard {
     this.bookingApiService.createBooking(request).subscribe({
       next: (result) => {
         this.isSubmitting = false;
-        this.successMessage = `Booking confirmed. ID: ${result.bookingId}`;
+        this.successMessage = `Rezerwacja zakończona sukcesem! Twój numer rezerwacji to ${result.bookingId}. Szczegóły rezerwacji zostały wysłane na podany adres email.`;
         this.currentStep = 1;
         this.selectedPackage = null;
         this.selectedDate = '';

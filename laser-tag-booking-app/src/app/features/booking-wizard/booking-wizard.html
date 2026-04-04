@@ -1,7 +1,7 @@
 <main class="booking-wizard">
 
   <header>
-    <h1>Booking Wizard</h1>
+    <h1>Zarezerwuj swoją grę w Comboarena.pl</h1>
   </header>
 
   <div class="progress-bar-wrapper">
@@ -28,7 +28,7 @@
         [class.active]="selectedCategory === 'regular'"
         [attr.aria-selected]="selectedCategory === 'regular'"
         (click)="setCategory('regular')">
-        🎯 Pakiety Zwykłe
+        🎯 Pakiety Standardowe
       </button>
       <button type="button" role="tab" class="category-toggle__btn"
         [class.active]="selectedCategory === 'birthday'"
@@ -143,9 +143,9 @@
 
       <div class="form-field">
         <label for="phone">Telefon</label>
-        <input id="phone" type="tel" formControlName="phone" placeholder="+48123456789" />
+        <input id="phone" type="tel" formControlName="phone" placeholder="123456789" />
         <small class="error-text" *ngIf="f('phone')?.touched && f('phone')?.hasError('required')">Numer telefonu jest wymagany.</small>
-        <small class="error-text" *ngIf="f('phone')?.touched && f('phone')?.hasError('pattern')">Proszę podać poprawny numer +48123456789</small>
+        <small class="error-text" *ngIf="f('phone')?.touched && f('phone')?.hasError('pattern')">Proszę podać poprawny numer 123456789</small>
       </div>
 
       <div class="form-field">
@@ -259,7 +259,7 @@
           </li>
         </ul>
       </div>
-      <button type="button" class="modal-close-btn" (click)="closeTerms()">Zamknij</button>
+      <button type="button" class="modal-close-btn" (click)="closeTerms()">Akceptuję</button>
     </div>
   </div>
 }
