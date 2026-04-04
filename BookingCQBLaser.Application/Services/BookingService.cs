@@ -16,15 +16,18 @@ public class BookingService : IBookingService
 
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
+    private readonly IEmailService _emailService;
     private readonly ILogger<BookingService> _logger;
 
     public BookingService(
         IBookingRepository repository,
         IGoogleCalendarService googleCalendarService,
+        IEmailService emailService,
         ILogger<BookingService> logger)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _googleCalendarService = googleCalendarService ?? throw new ArgumentNullException(nameof(googleCalendarService));
+        _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -124,6 +127,21 @@ public class BookingService : IBookingService
                 "Failed to create Google Calendar event for booking {BookingId}. Booking saved but calendar sync failed.",
                 booking.Id);
             // Booking is still valid, calendar sync can be retried later
+        }
+
+        int packagePrice = dto.Package.GetPrice();
+        int totalCost = packagePrice * dto.ParticipantsCount;
+        int depositAmount = 300;
+        int remainingBalance = Math.Max(0, totalCost - depositAmount);
+
+        try
+        {
+            await _emailService.SendBookingConfirmationAsync(booking, totalCost, depositAmount, remainingBalance);
+            _logger.LogInformation("Confirmation email sent to {Email} for booking {BookingId}", booking.Customer.Email, booking.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send confirmation email to {Email} for booking {BookingId}.", booking.Customer.Email, booking.Id);
         }
 
         return booking.Id;
