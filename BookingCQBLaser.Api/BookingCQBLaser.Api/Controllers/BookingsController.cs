@@ -2,6 +2,9 @@
 using BookingCQBLaser.Application.Services;
 using BookingCQBLaser.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace BookingCQBLaser.Api.Controllers;
 
@@ -32,6 +35,7 @@ public class BookingsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _bookingService.CreateBookingAsync(dto, cancellationToken);
-        return Ok(new { BookingId = result });
+        // Correctly return the DTO object containing BookingId and PaymentUrl
+        return Ok(result);
     }
 }

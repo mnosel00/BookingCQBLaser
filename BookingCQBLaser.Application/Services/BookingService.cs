@@ -1,4 +1,5 @@
-﻿using BookingCQBLaser.Application.DTOs;
+﻿// ..\BookingCQBLaser.Application\Services\BookingService.cs
+using BookingCQBLaser.Application.DTOs;
 using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Enums;
 using BookingCQBLaser.Domain.Interfaces;
@@ -17,17 +18,20 @@ public class BookingService : IBookingService
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
     private readonly IEmailService _emailService;
+    private readonly IHotPayService _hotpayService;
     private readonly ILogger<BookingService> _logger;
 
     public BookingService(
         IBookingRepository repository,
         IGoogleCalendarService googleCalendarService,
         IEmailService emailService,
+        IHotPayService hotpayService,
         ILogger<BookingService> logger)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _googleCalendarService = googleCalendarService ?? throw new ArgumentNullException(nameof(googleCalendarService));
         _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
+        _hotpayService = hotpayService ?? throw new ArgumentNullException(nameof(hotpayService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -76,11 +80,10 @@ public class BookingService : IBookingService
         return availableSlots;
     }
 
-    public async Task<Guid> CreateBookingAsync(
-    CreateBookingDto dto,
-    CancellationToken cancellationToken = default)
+    public async Task<CreateBookingResponseDto> CreateBookingAsync(
+        CreateBookingDto dto,
+        CancellationToken cancellationToken = default)
     {
-        // Verify slot availability to prevent race conditions
         var availableSlots = await GetAvailableTimeSlotsAsync(dto.StartTime, dto.Package, cancellationToken);
         var isSlotAvailable = availableSlots.Any(slot => slot.StartTime == dto.StartTime);
 
@@ -108,8 +111,36 @@ public class BookingService : IBookingService
             totalBlockedDurationMinutes);
 
         await _repository.AddAsync(booking, cancellationToken);
-        _logger.LogInformation("Booking {BookingId} saved to database", booking.Id);
+        _logger.LogInformation("Booking {BookingId} saved to database as Pending", booking.Id);
 
+        int depositAmountP = 304;
+        string paymentUrl = _hotpayService.GeneratePaymentUrl(booking, depositAmountP);
+
+        return new CreateBookingResponseDto(booking.Id, paymentUrl);
+    }
+
+    public async Task ConfirmBookingPaymentAsync(Guid bookingId, CancellationToken cancellationToken = default)
+    {
+        var booking = await _repository.GetByIdAsync(bookingId, cancellationToken);
+
+        if (booking == null)
+        {
+            _logger.LogError("Booking with ID {Id} not found during payment confirmation.", bookingId);
+            throw new KeyNotFoundException($"Booking with ID {bookingId} not found.");
+        }
+
+        if (booking.PaymentStatus == PaymentStatus.Paid)
+        {
+            _logger.LogInformation("Booking {Id} was already processed as paid.", booking.Id);
+            return;
+        }
+
+        // 1. Update DB Status
+        booking.MarkAsPaid();
+        await _repository.UpdateAsync(booking, cancellationToken);
+        _logger.LogInformation("Booking {Id} marked as paid.", booking.Id);
+
+        // 2. Sync to Calendar
         try
         {
             var googleEventId = await _googleCalendarService.CreateEventAsync(booking, cancellationToken);
@@ -124,27 +155,25 @@ public class BookingService : IBookingService
         {
             _logger.LogError(
                 ex,
-                "Failed to create Google Calendar event for booking {BookingId}. Booking saved but calendar sync failed.",
+                "Failed to create Google Calendar event for paid booking {BookingId}. Booking saved but calendar sync failed.",
                 booking.Id);
-            // Booking is still valid, calendar sync can be retried later
         }
 
-        int packagePrice = dto.Package.GetPrice();
-        int totalCost = packagePrice * dto.ParticipantsCount;
-        int depositAmount = 300;
-        int remainingBalance = Math.Max(0, totalCost - depositAmount);
-
+        // 3. Send Email
         try
         {
+            int packagePrice = booking.Package.GetPrice();
+            int totalCost = packagePrice * booking.ParticipantsCount;
+            int depositAmount = 300;
+            int remainingBalance = Math.Max(0, totalCost - depositAmount);
+
             await _emailService.SendBookingConfirmationAsync(booking, totalCost, depositAmount, remainingBalance);
             _logger.LogInformation("Confirmation email sent to {Email} for booking {BookingId}", booking.Customer.Email, booking.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send confirmation email to {Email} for booking {BookingId}.", booking.Customer.Email, booking.Id);
+            _logger.LogError(ex, "Failed to send confirmation email to {Email} for paid booking {BookingId}.", booking.Customer.Email, booking.Id);
         }
-
-        return booking.Id;
     }
 
     private async Task<List<(DateTimeOffset Start, DateTimeOffset End)>> GetCombinedBusyPeriodsAsync(
@@ -162,8 +191,6 @@ public class BookingService : IBookingService
 
         var busyPeriods = new List<(DateTimeOffset Start, DateTimeOffset End)>();
 
-        // Add local bookings as busy periods ONLY if they haven't been synced to Google Calendar
-        // If they have a Google Event ID, let Google's FreeBusy response dictate if the time is actually blocked
         foreach (var booking in localBookings)
         {
             if (string.IsNullOrEmpty(booking.GoogleCalendarEventId))
@@ -172,18 +199,14 @@ public class BookingService : IBookingService
             }
         }
 
-        // Add Google Calendar busy periods
         busyPeriods.AddRange(googleBusyPeriods);
-
-        // Sort and merge overlapping periods for efficiency
         return MergeBusyPeriods(busyPeriods);
     }
 
     private static List<(DateTimeOffset Start, DateTimeOffset End)> MergeBusyPeriods(
         List<(DateTimeOffset Start, DateTimeOffset End)> periods)
     {
-        if (periods.Count == 0)
-            return periods;
+        if (periods.Count == 0) return periods;
 
         var sorted = periods.OrderBy(p => p.Start).ToList();
         var merged = new List<(DateTimeOffset Start, DateTimeOffset End)> { sorted[0] };
@@ -212,13 +235,11 @@ public class BookingService : IBookingService
     {
         foreach (var (busyStart, busyEnd) in busyPeriods)
         {
-            // Check if slot overlaps with busy period
             if (slotStart < busyEnd && slotEnd > busyStart)
             {
                 return true;
             }
         }
-
         return false;
     }
 }

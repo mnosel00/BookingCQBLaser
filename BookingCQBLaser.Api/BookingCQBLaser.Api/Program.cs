@@ -2,6 +2,7 @@ using BookingCQBLaser.Application.Services;
 using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Interfaces;
 using BookingCQBLaser.Infrastructure.ExternalServices;
+using BookingCQBLaser.Infrastructure.ExternalServices.PGateway;
 using BookingCQBLaser.Infrastructure.Persistence.Configurations;
 using BookingCQBLaser.Infrastructure.Persistence.Repositories;
 using Microsoft.AspNetCore.Builder.Extensions;
@@ -20,12 +21,16 @@ builder.Services.Configure<GoogleCalendarOptions>(
 //Email sender
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("SmtpOptions"));
 
+//PGateway
+builder.Services.Configure<HotPayOptions>(builder.Configuration.GetSection("HotPayOptions"));
+
 // Register repositories
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 
 // Register external services
 builder.Services.AddScoped<IGoogleCalendarService, GoogleCalendarService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IHotPayService, HotPayService>();
 
 // Register application services
 builder.Services.AddScoped<IBookingService, BookingService>();

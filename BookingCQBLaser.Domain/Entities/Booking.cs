@@ -18,6 +18,8 @@ namespace BookingCQBLaser.Domain.Entities
         public DateTimeOffset EndTime { get; private set; }
         public string? GoogleCalendarEventId { get; private set; }
         public DateTimeOffset CreatedAt { get; private set; }
+        public PaymentStatus PaymentStatus { get; private set; } = PaymentStatus.Pending;
+
 
         // Constructor for ORM usage
         private Booking() { }
@@ -54,6 +56,11 @@ namespace BookingCQBLaser.Domain.Entities
         public void UpdateGoogleCalendarEventId(string? eventId)
         {
             GoogleCalendarEventId = eventId;
+        }
+
+        public void MarkAsPaid()
+        {
+            PaymentStatus = PaymentStatus.Paid;
         }
     }
 }

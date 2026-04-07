@@ -23,3 +23,8 @@ export interface CreateBookingRequest {
   package: PackageType;
   startTime: string;
 }
+
+export interface CreateBookingResponse {
+  bookingId: string;
+  paymentUrl: string;
+}

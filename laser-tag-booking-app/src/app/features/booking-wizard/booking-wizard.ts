@@ -261,27 +261,14 @@ export class BookingWizard {
     this.isSubmitting = true;
 
     this.bookingApiService.createBooking(request).subscribe({
-      next: (result) => {
+      next: (result: any) => {
         this.isSubmitting = false;
-        this.successMessage = `Rezerwacja zakończona sukcesem! Twój numer rezerwacji to ${result.bookingId}. Szczegóły rezerwacji zostały wysłane na podany adres email.`;
-        this.currentStep = 1;
-        this.selectedPackage = null;
-        this.selectedDate = '';
-        this.availableSlots = [];
-        this.selectedSlot = null;
-        this.customerForm.reset({
-          firstName: '',
-          lastName: '',
-          email: '',
-          phone: '',
-          participantsCount: 1,
-          acceptTerms: false,
-          acceptLegal: false
-        });
-        this.hasOpenedTerms = false;
-        this.customerForm.get('acceptTerms')?.disable();
+        window.location.href = result.paymentUrl;
       },
-      error: () => { this.isSubmitting = false; window.alert('Booking failed. Please try again.'); }
+      error: () => { 
+        this.isSubmitting = false; 
+        window.alert('Booking failed. Please try again.'); 
+      }
     });
   }
 }
