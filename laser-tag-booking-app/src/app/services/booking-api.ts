@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { TimeSlot, CreateBookingRequest, PackageType } from '../models/booking.models';
 
@@ -15,6 +15,13 @@ export class BookingApiService {
   //   const url = `${this.apiUrl}/available-slots?date=${encodeURIComponent(date)}&package=${packageType}`;
   //   return this.httpClient.get<TimeSlot[]>(url);
   // }
+
+  getAvailableSlots(date: string, packageType: PackageType): Observable<TimeSlot[]> {
+  const headers = new HttpHeaders().set('ngrok-skip-browser-warning', 'true');
+  const url = `${this.apiUrl}/available-slots?date=${encodeURIComponent(date)}&package=${packageType}`;
+  
+  return this.httpClient.get<TimeSlot[]>(url, { headers });
+}
 
   createBooking(request: CreateBookingRequest): Observable<{ bookingId: string }> {
     return this.httpClient.post<{ bookingId: string }>(this.apiUrl, request);
