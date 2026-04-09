@@ -47,7 +47,7 @@ namespace BookingCQBLaser.Api.Controllers
             try
             {
                 await _bookingService.ConfirmBookingPaymentAsync(bookingId, cancellationToken);
-                return Ok("SUCCESS");
+                return Ok();
             }
             catch (KeyNotFoundException ex)
             {

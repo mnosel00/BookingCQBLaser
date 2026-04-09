@@ -19,6 +19,7 @@ namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
         {
             _options = options.Value;
         }
+
         public string GeneratePaymentUrl(Booking booking, int amount)
         {
             return $"https://platnosc.hotpay.pl/?SEKRET={_options.Secret}&KWOTA={amount}&NAZWA_USLUGI=Rezerwacja&ADRES_PRZEKIEROWANIA={_options.SuccessUrl}&ID_ZAMOWIENIA={booking.Id}&EMAIL={booking.Customer.Email}";
@@ -26,20 +27,24 @@ namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
 
         public bool ValidateNotification(IFormCollection formData)
         {
+            var hash = formData["HASH"].ToString();
+            var status = formData["STATUS"].ToString();
             var kwota = formData["KWOTA"].ToString();
             var idZamowienia = formData["ID_ZAMOWIENIA"].ToString();
-            var status = formData["STATUS"].ToString();
-            var secure = formData["SECURE"].ToString();
             var idPlatnosci = formData["ID_PLATNOSCI"].ToString();
+            var sekret = formData["SEKRET"].ToString();
+
+            if (string.IsNullOrEmpty(status) || string.IsNullOrEmpty(hash))
+                return false;
 
             if (status != "SUCCESS")
                 return false;
 
-            // HotPay Hash Format: SHA256(Password + ";" + STATUS + ";" + KWOTA + ";" + ID_ZAMOWIENIA + ";" + ID_PLATNOSCI)
-            var rawString = $"{_options.Password};{status};{kwota};{idZamowienia};{idPlatnosci}";
+            // Password + ";" + KWOTA + ";" + ID_PLATNOSCI + ";" + ID_ZAMOWIENIA + ";" + STATUS + ";" + SEKRET
+            var rawString = $"{_options.Password};{kwota};{idPlatnosci};{idZamowienia};{status};{sekret}";
             var computedHash = ComputeSha256(rawString);
 
-            return string.Equals(secure, computedHash, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(hash, computedHash, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string ComputeSha256(string rawData)

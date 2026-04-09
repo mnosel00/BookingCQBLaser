@@ -9,7 +9,7 @@ import { RouterModule } from '@angular/router';
     <div class="success-container">
       <div class="success-card">
         <h1>Dziękujemy za rezerwację!</h1>
-        <p>Twoja płatność jest przetwarzana. Gdy tylko otrzymamy potwierdzenie z banku, wyślemy na Twój adres e-mail oficjalne potwierdzenie rezerwacji oraz bilet wstępu.</p>
+        <p>Gdy tylko otrzymamy płatność, wyślemy na Twój adres e-mail potwierdzenie rezerwacji wraz z szczegółami.</p>
         <a routerLink="/" class="home-btn">Wróć na stronę główną</a>
       </div>
     </div>
