@@ -1,6 +1,7 @@
 using BookingCQBLaser.Application.Services;
 using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Interfaces;
+using BookingCQBLaser.Infrastructure.BackgroundJobs;
 using BookingCQBLaser.Infrastructure.ExternalServices;
 using BookingCQBLaser.Infrastructure.ExternalServices.PGateway;
 using BookingCQBLaser.Infrastructure.Persistence.Configurations;
@@ -32,6 +33,10 @@ builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IGoogleCalendarService, GoogleCalendarService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IHotPayService, HotPayService>();
+
+//Background Services
+builder.Services.AddHostedService<ExpiredBookingCleanupService>();
+
 
 // Register application services
 builder.Services.AddScoped<IBookingService, BookingService>();

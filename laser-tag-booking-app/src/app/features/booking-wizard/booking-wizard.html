@@ -82,24 +82,31 @@
     <input
       id="bookingDate"
       type="date"
+      [min]="minDateValue"
       [value]="selectedDateValue"
       (change)="onDateChange(($any($event.target)).value)"
     />
 
-    <p *ngIf="isLoadingSlots" class="loading-text">Ładowanie slotów...</p>
+    <div *ngIf="showPhoneContactWarning" class="error-text error-text--important" style="margin-top: 1rem;">
+      Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199
+    </div>
 
-    <ng-container *ngIf="!isLoadingSlots">
-      <ul *ngIf="availableSlots.length > 0; else noSlots">
-        <li *ngFor="let slot of availableSlots">
-          <button type="button" (click)="selectSlot(slot)">
-            {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
-          </button>
-        </li>
-      </ul>
+    <ng-container *ngIf="!showPhoneContactWarning">
+      <p *ngIf="isLoadingSlots" class="loading-text">Ładowanie slotów...</p>
 
-      <ng-template #noSlots>
-        <p class="empty-state" *ngIf="selectedDate">Brak dostępnych slotów dla wybranej daty.</p>
-      </ng-template>
+      <ng-container *ngIf="!isLoadingSlots">
+        <ul *ngIf="availableSlots.length > 0; else noSlots">
+          <li *ngFor="let slot of availableSlots">
+            <button type="button" (click)="selectSlot(slot)">
+              {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
+            </button>
+          </li>
+        </ul>
+
+        <ng-template #noSlots>
+          <p class="empty-state" *ngIf="selectedDate">Brak dostępnych slotów dla wybranej daty.</p>
+        </ng-template>
+      </ng-container>
     </ng-container>
   </section>
 

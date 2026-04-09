@@ -44,6 +44,9 @@ export class BookingWizard {
   successMessage = '';
   showTermsModal = false;
   hasOpenedTerms = false;
+  showPhoneContactWarning = false;
+
+  readonly minDateValue: string = new Date().toISOString().slice(0, 10);
 
   readonly packagesList: PackageDetails[] = [
     {
@@ -208,6 +211,7 @@ export class BookingWizard {
     this.availableSlots = [];
     this.selectedSlot = null;
     this.successMessage = '';
+    this.showPhoneContactWarning = false;
 
     const minPersons = this.packagesList.find(p => p.type === pkg)?.minPersons ?? 8;
     const participantsCtrl = this.customerForm.get('participantsCount')!;
@@ -221,12 +225,47 @@ export class BookingWizard {
     this.currentStep = 2;
   }
 
+  isOnlineBookingAllowed(selectedDate: Date): boolean {
+    const now = new Date(); // Browser's local time
+    const target = new Date(selectedDate);
+    target.setHours(0, 0, 0, 0);
+
+    const dayOfWeek = target.getDay(); // 0 is Sunday, 6 is Saturday
+
+    if (dayOfWeek === 6) { // Saturday
+        const deadline = new Date(target);
+        deadline.setDate(deadline.getDate() - 1); // Friday
+        deadline.setHours(22, 0, 0, 0);
+        return now.getTime() <= deadline.getTime();
+    }
+
+    if (dayOfWeek === 0) { // Sunday
+        const deadline = new Date(target);
+        deadline.setDate(deadline.getDate() - 1); // Saturday
+        deadline.setHours(22, 0, 0, 0);
+        return now.getTime() <= deadline.getTime();
+    }
+
+    // Monday-Friday (3 days buffer)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffTime = target.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 3;
+  }
+
   onDateChange(date: string): void {
     this.selectedDate = date;
     this.availableSlots = [];
     this.selectedSlot = null;
+    this.showPhoneContactWarning = false;
 
     if (!date || this.selectedPackage === null) return;
+
+    if (!this.isOnlineBookingAllowed(new Date(date))) {
+      this.showPhoneContactWarning = true;
+      return;
+    }
 
     this.isLoadingSlots = true;
     this.bookingApiService.getAvailableSlots(date, this.selectedPackage).subscribe({

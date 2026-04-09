@@ -5,6 +5,11 @@ using BookingCQBLaser.Domain.Enums;
 using BookingCQBLaser.Domain.Interfaces;
 using BookingCQBLaser.Domain.ValueObject;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace BookingCQBLaser.Application.Services;
 
@@ -13,7 +18,6 @@ public class BookingService : IBookingService
     private const int TurnaroundBufferMinutes = 30;
     private const int SlotIntervalMinutes = 10;
     private static readonly TimeOnly ArenaOpenTime = new(8, 0);
-    private static readonly TimeOnly LatestStartTime = new(22, 0);
 
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
@@ -35,11 +39,63 @@ public class BookingService : IBookingService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    private static TimeZoneInfo GetPolandTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            // Fallback for Windows instances without IANA time zone support
+            return TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
+        }
+    }
+
+    private TimeOnly GetLatestStartTime(DateTimeOffset date)
+    {
+        if (date.DayOfWeek == DayOfWeek.Sunday)
+        {
+            return new TimeOnly(15, 0);
+        }
+        return new TimeOnly(22, 0);
+    }
+
+    private bool IsOnlineBookingAllowed(DateTimeOffset targetDate, DateTimeOffset nowInPoland)
+    {
+        if (targetDate.Date < nowInPoland.Date) return false;
+
+        if (targetDate.DayOfWeek == DayOfWeek.Saturday)
+        {
+            var deadline = targetDate.Date.AddDays(-1).AddHours(22); // Friday 22:00
+            return nowInPoland <= deadline;
+        }
+        if (targetDate.DayOfWeek == DayOfWeek.Sunday)
+        {
+            var deadline = targetDate.Date.AddDays(-1).AddHours(22); // Saturday 22:00
+            return nowInPoland <= deadline;
+        }
+
+        // Monday-Friday (3 calendar days rule)
+        return targetDate.Date >= nowInPoland.Date.AddDays(3);
+    }
+
     public async Task<IEnumerable<TimeSlotDto>> GetAvailableTimeSlotsAsync(
         DateTimeOffset date,
         PackageType package,
         CancellationToken cancellationToken = default)
     {
+        var polandTimeZone = GetPolandTimeZone();
+        var nowInPoland = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandTimeZone);
+
+        var requestedDateInPoland = TimeZoneInfo.ConvertTimeFromUtc(date.UtcDateTime, polandTimeZone);
+
+        if (!IsOnlineBookingAllowed(requestedDateInPoland, nowInPoland))
+        {
+            _logger.LogInformation("Requested date {Date} is not allowed by booking rules. Returning empty slots.", requestedDateInPoland.Date);
+            return new List<TimeSlotDto>();
+        }
+
         var packageBaseDuration = package.GetBaseDurationMinutes();
         var totalDurationMinutes = packageBaseDuration + TurnaroundBufferMinutes;
 
@@ -48,9 +104,10 @@ public class BookingService : IBookingService
             ArenaOpenTime.Hour, ArenaOpenTime.Minute, 0,
             date.Offset);
 
+        var latestTime = GetLatestStartTime(requestedDateInPoland);
         var latestStart = new DateTimeOffset(
             date.Year, date.Month, date.Day,
-            LatestStartTime.Hour, LatestStartTime.Minute, 0,
+            latestTime.Hour, latestTime.Minute, 0,
             date.Offset);
 
         var dayEnd = dayStart.AddDays(1);
@@ -88,6 +145,15 @@ public class BookingService : IBookingService
         CreateBookingDto dto,
         CancellationToken cancellationToken = default)
     {
+        var polandTimeZone = GetPolandTimeZone();
+        var nowInPoland = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandTimeZone);
+        var requestedDateInPoland = TimeZoneInfo.ConvertTimeFromUtc(dto.StartTime.UtcDateTime, polandTimeZone);
+
+        if (!IsOnlineBookingAllowed(requestedDateInPoland, nowInPoland))
+        {
+            throw new InvalidOperationException("Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199");
+        }
+
         var availableSlots = await GetAvailableTimeSlotsAsync(dto.StartTime, dto.Package, cancellationToken);
         var isSlotAvailable = availableSlots.Any(slot => slot.StartTime == dto.StartTime);
 
