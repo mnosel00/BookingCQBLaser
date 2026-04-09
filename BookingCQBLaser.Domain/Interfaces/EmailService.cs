@@ -42,7 +42,7 @@ namespace BookingCQBLaser.Domain.Interfaces
                         <h3>Szczegóły</h3>
                         <ul>
                             <li><strong>Data i godzina rezerwacji:</strong> {booking.StartTime:dd.MM.yyyy HH:mm}</li>
-                            <li><strong>Suma kosztów:</strong> {totalCost} PLN</li>
+                            <li><strong>Cena:</strong> {totalCost} PLN</li>
                             <li><strong>Zapłacono:</strong> {paidAmount} PLN</li>
                             <li><strong>Do zapłaty na miejscu:</strong> {remainingBalance} PLN (TYLKO GOTÓWKĄ)</li>
                         </ul>

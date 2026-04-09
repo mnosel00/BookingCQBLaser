@@ -13,6 +13,8 @@ namespace BookingCQBLaser.Domain.ValueObject
         public string Email { get; }
         public string Phone { get; }
 
+        private CustomerInfo() { } 
+
         public CustomerInfo(string firstName, string lastName, string email, string phone)
         {
             if (string.IsNullOrWhiteSpace(firstName)) throw new ArgumentException("First name is required.", nameof(firstName));

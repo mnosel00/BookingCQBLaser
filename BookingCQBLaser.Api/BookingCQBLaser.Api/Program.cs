@@ -10,9 +10,10 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Check that this using directive is present to access UseNpgsql (often included implicitly, but good to ensure)
 // Add services to the container.
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Configure Google Calendar options
 builder.Services.Configure<GoogleCalendarOptions>(
@@ -40,7 +41,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AngularApp", policy =>
     {
-        policy.AllowAnyOrigin()  // Pozwala na KAŻDY adres (Netlify, localhost, telefon, itp.)
+        policy.AllowAnyOrigin()
               .AllowAnyMethod()
               .AllowAnyHeader();
     });

@@ -3,11 +3,8 @@ using BookingCQBLaser.Domain.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
 {
@@ -37,8 +34,7 @@ namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
             if (string.IsNullOrEmpty(status) || string.IsNullOrEmpty(hash))
                 return false;
 
-            if (status != "SUCCESS")
-                return false;
+            
 
             // Password + ";" + KWOTA + ";" + ID_PLATNOSCI + ";" + ID_ZAMOWIENIA + ";" + STATUS + ";" + SEKRET
             var rawString = $"{_options.Password};{kwota};{idPlatnosci};{idZamowienia};{status};{sekret}";

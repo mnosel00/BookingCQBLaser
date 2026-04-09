@@ -55,7 +55,11 @@ public class BookingService : IBookingService
 
         var dayEnd = dayStart.AddDays(1);
 
-        var busyPeriods = await GetCombinedBusyPeriodsAsync(dayStart, dayEnd, cancellationToken);
+        // Convert boundaries to UTC for DB and Google Calendar queries
+        var busyPeriods = await GetCombinedBusyPeriodsAsync(
+            dayStart.ToUniversalTime(), 
+            dayEnd.ToUniversalTime(), 
+            cancellationToken);
 
         var availableSlots = new List<TimeSlotDto>();
         var currentSlotStart = dayStart;
@@ -103,11 +107,12 @@ public class BookingService : IBookingService
 
         var totalBlockedDurationMinutes = dto.Package.GetBaseDurationMinutes() + TurnaroundBufferMinutes;
 
+        // Ensure StartTime is converted to UTC to satisfy Npgsql
         var booking = new Booking(
             customerInfo,
             dto.ParticipantsCount,
             dto.Package,
-            dto.StartTime,
+            dto.StartTime.ToUniversalTime(), 
             totalBlockedDurationMinutes);
 
         await _repository.AddAsync(booking, cancellationToken);

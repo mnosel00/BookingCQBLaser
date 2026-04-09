@@ -1,10 +1,11 @@
 ﻿using BookingCQBLaser.Domain.Entities;
+using BookingCQBLaser.Domain.Enums;
 using BookingCQBLaser.Domain.Interfaces;
 using BookingCQBLaser.Infrastructure.Persistence.Configurations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,8 +28,11 @@ namespace BookingCQBLaser.Infrastructure.Persistence.Repositories
 
         public async Task<IEnumerable<Booking>> GetByDateRangeAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken cancellationToken = default)
         {
+            start = start.ToUniversalTime();
+            end = end.ToUniversalTime();
+
             return await _dbContext.Bookings
-                .Where(b => b.StartTime >= start && b.EndTime <= end)
+                .Where(b => b.StartTime >= start && b.StartTime <= end && b.PaymentStatus != PaymentStatus.Failed)
                 .ToListAsync(cancellationToken);
         }
 

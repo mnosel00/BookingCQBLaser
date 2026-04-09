@@ -1,28 +1,36 @@
 ﻿using BookingCQBLaser.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BookingCQBLaser.Infrastructure.Persistence.Configurations
 {
     public class AppDbContext : DbContext
     {
-        public DbSet<Booking> Bookings { get; set; }
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
-        {
-        }
+        public DbSet<Booking> Bookings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+            // 1. APPLY ALL EXTERNAL CONFIGURATIONS
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+            // 2. Ensure all DateTimeOffset properties are saved and read as UTC for PostgreSQL
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?))
+                    {
+                        property.SetValueConverter(new ValueConverter<DateTimeOffset, DateTimeOffset>(
+                            v => v.ToUniversalTime(),
+                            v => v.ToUniversalTime()));
+                    }
+                }
+            }
         }
     }
 }
