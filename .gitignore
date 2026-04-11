@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 
 appsettings.Development.json
+/BookingCQBLaser.Api/BookingCQBLaser.Api/appsettings.Development.json
