@@ -1,0 +1,23 @@
+# --- ETAP 1: Budowanie aplikacji (Ciężki obraz SDK) ---
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Kopiujemy cały kod źródłowy z Twojego komputera do kontenera
+COPY . .
+
+# Pobieramy paczki NuGet i kompilujemy główny projekt API
+RUN dotnet restore "BookingCQBLaser.Api/BookingCQBLaser.Api.csproj"
+RUN dotnet publish "BookingCQBLaser.Api/BookingCQBLaser.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# --- ETAP 2: Uruchomienie (Lekki obraz tylko do działania) ---
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+
+# W .NET 8 domyślnym portem wewnątrz Dockera jest 8080
+EXPOSE 8080
+
+# Kopiujemy gotowe, skompilowane pliki z Etapu 1
+COPY --from=build /app/publish .
+
+# Komenda startowa
+ENTRYPOINT ["dotnet", "BookingCQBLaser.Api.dll"]
