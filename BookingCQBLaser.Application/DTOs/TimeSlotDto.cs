@@ -8,5 +8,6 @@ namespace BookingCQBLaser.Application.DTOs
 {
     public record TimeSlotDto(
         DateTimeOffset StartTime,
-        int MaxAvailableDurationMinutes);
+        bool Is90MinutePackageAllowed,
+        bool Is120MinutePackageAllowed);
 }

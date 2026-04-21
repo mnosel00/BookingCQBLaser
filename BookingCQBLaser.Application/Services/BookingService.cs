@@ -19,7 +19,6 @@ public class BookingService : IBookingService
     private const int Group1TotalBlockedDurationMinutes = 90;  // S1, S2, Premium
     private const int Group2TotalBlockedDurationMinutes = 120; // Max, U1, U2, U3, Combat
     private static readonly TimeOnly ArenaOpenTime = new(8, 0);
-    private static readonly int[] AnchorGridHours = [8, 10, 12, 14, 16, 18, 20];
 
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
@@ -119,6 +118,9 @@ public class BookingService : IBookingService
             return [];
         }
 
+        // NEW: Strict Docking Mode
+        bool isStrictDockingMode = localBookings.Count >= 3;
+
         var googleBusyPeriods = await _googleCalendarService.GetBusyPeriodsAsync(dayStartUtc, dayEndUtc, cancellationToken);
 
         var busyPeriods = new List<(DateTimeOffset Start, DateTimeOffset End)>();
@@ -142,60 +144,149 @@ public class BookingService : IBookingService
                 .ToList());
 
         var gaps = BuildGaps(mergedBusyPeriods, dayStartUtc, dayEndUtc);
-
         var priorityGaps = gaps
-            .Where(g => g.IsInternal && g.DurationMinutes <= 240)
+            .Where(g => g.IsInternal && g.DurationMinutes <= 240 && IsGapFillable(g.DurationMinutes, false))
             .ToList();
 
-        bool priorityMode = priorityGaps.Count > 0;
-        var targetGaps = priorityMode ? priorityGaps : gaps;
+        bool isPriorityMode = priorityGaps.Count > 0;
 
-        // Key = UTC start, Value = max duration (90/120)
-        var slotCandidates = new Dictionary<DateTimeOffset, int>();
+        var slots = new List<TimeSlotDto>();
 
-        // 1) Magnetic slots (always)
-        foreach (var gap in targetGaps)
+        for (var currentSlotStartUtc = dayStartUtc;
+             currentSlotStartUtc <= latestStartUtc;
+             currentSlotStartUtc = currentSlotStartUtc.AddMinutes(30))
         {
-            AddMagneticCandidatesForGap(gap, latestStartUtc, slotCandidates);
-        }
-
-        // 2) Anchor grid only outside priority mode
-        if (!priorityMode)
-        {
-            foreach (var hour in AnchorGridHours)
+            // Cannot start inside a busy period.
+            if (mergedBusyPeriods.Any(p => currentSlotStartUtc >= p.Start && currentSlotStartUtc < p.End))
             {
-                var anchorLocal = new DateTimeOffset(date.Year, date.Month, date.Day, hour, 0, 0, date.Offset);
-                var anchorUtc = anchorLocal.ToUniversalTime();
+                continue;
+            }
 
-                if (anchorUtc < dayStartUtc || anchorUtc > latestStartUtc)
+            // Previous booking end (or day start).
+            DateTimeOffset? closestPreviousBookingEnd = null;
+            foreach (var period in mergedBusyPeriods)
+            {
+                if (period.End <= currentSlotStartUtc &&
+                    (closestPreviousBookingEnd == null || period.End > closestPreviousBookingEnd.Value))
+                {
+                    closestPreviousBookingEnd = period.End;
+                }
+            }
+
+            // Next booking start (or day end).
+            DateTimeOffset? closestNextBookingStart = null;
+            foreach (var period in mergedBusyPeriods)
+            {
+                if (period.Start > currentSlotStartUtc &&
+                    (closestNextBookingStart == null || period.Start < closestNextBookingStart.Value))
+                {
+                    closestNextBookingStart = period.Start;
+                }
+            }
+
+            // NEW: strict docking pre-check right after previous/next lookup
+            bool docksAtStart = closestPreviousBookingEnd.HasValue && currentSlotStartUtc == closestPreviousBookingEnd.Value;
+            bool docksAtEndFor90 = closestNextBookingStart.HasValue && currentSlotStartUtc.AddMinutes(Group1TotalBlockedDurationMinutes) == closestNextBookingStart.Value;
+            bool docksAtEndFor120 = closestNextBookingStart.HasValue && currentSlotStartUtc.AddMinutes(Group2TotalBlockedDurationMinutes) == closestNextBookingStart.Value;
+
+            if (isStrictDockingMode && !(docksAtStart || docksAtEndFor90 || docksAtEndFor120))
+            {
+                continue;
+            }
+
+            var previousBoundaryUtc = closestPreviousBookingEnd ?? dayStartUtc;
+            bool isStartBoundary = closestPreviousBookingEnd == null;
+
+            var nextBoundaryUtc = closestNextBookingStart ?? dayEndUtc;
+            bool isEndBoundary = closestNextBookingStart == null;
+
+            var gapBeforeMinutes = (int)(currentSlotStartUtc - previousBoundaryUtc).TotalMinutes;
+            var spaceAheadMinutes = (int)(nextBoundaryUtc - currentSlotStartUtc).TotalMinutes;
+
+            // Find the gap that contains current candidate.
+            var containingGap = gaps.FirstOrDefault(g => currentSlotStartUtc >= g.Start && currentSlotStartUtc < g.End);
+            if (containingGap.DurationMinutes == 0)
+            {
+                continue;
+            }
+
+            // Mode-based filtering:
+            if (isPriorityMode)
+            {
+                // Must be inside one of the <=240 internal gaps.
+                if (!(containingGap.IsInternal && containingGap.DurationMinutes <= 240))
                 {
                     continue;
                 }
-
-                var containingGap = gaps.FirstOrDefault(g => anchorUtc >= g.Start && anchorUtc < g.End);
-                if (containingGap.DurationMinutes == 0)
+            }
+            else
+            {
+                // Normal mode: block candidates creating dead holes behind (except start-of-day boundary).
+                if (!IsGapFillable(gapBeforeMinutes, isStartBoundary))
                 {
                     continue;
                 }
+            }
 
-                var maxDuration = EvaluateCandidateInGap(anchorUtc, containingGap, mustBeMagnetic: false);
-                if (maxDuration > 0)
+            bool CanUseDuration(int durationMinutes)
+            {
+                if (spaceAheadMinutes < durationMinutes)
                 {
-                    AddOrUpdateCandidate(slotCandidates, anchorUtc, maxDuration);
+                    return false;
                 }
+
+                var currentSlotEndUtc = currentSlotStartUtc.AddMinutes(durationMinutes);
+
+                // Priority mode edge docking inside small gaps.
+                if (isPriorityMode)
+                {
+                    bool touchesGapEdge = currentSlotStartUtc == containingGap.Start || currentSlotEndUtc == containingGap.End;
+                    if (!touchesGapEdge)
+                    {
+                        return false;
+                    }
+                }
+
+                // Strict docking rule per specific duration.
+                if (isStrictDockingMode)
+                {
+                    bool docksForThisDuration =
+                        docksAtStart ||
+                        (durationMinutes == Group1TotalBlockedDurationMinutes && docksAtEndFor90) ||
+                        (durationMinutes == Group2TotalBlockedDurationMinutes && docksAtEndFor120);
+
+                    if (!docksForThisDuration)
+                    {
+                        return false;
+                    }
+                }
+
+                var remainingAfterMinutes = spaceAheadMinutes - durationMinutes;
+                return IsGapFillable(remainingAfterMinutes, isEndBoundary);
+            }
+
+            // Evaluate both independently.
+            bool fits120 = CanUseDuration(Group2TotalBlockedDurationMinutes);
+            bool fits90 = CanUseDuration(Group1TotalBlockedDurationMinutes);
+
+            if (fits90 || fits120)
+            {
+                slots.Add(new TimeSlotDto(
+                    currentSlotStartUtc.ToOffset(date.Offset),
+                    fits90,
+                    fits120));
             }
         }
 
-        var finalSlots = slotCandidates
-            .OrderBy(x => x.Key)
-            .Select(x => new TimeSlotDto(x.Key.ToOffset(date.Offset), x.Value))
+        // Aggregate by start time and OR the package-permission flags.
+        return slots
+            .GroupBy(x => x.StartTime)
+            .Select(g => new TimeSlotDto(
+                g.Key,
+                g.Any(x => x.Is90MinutePackageAllowed),
+                g.Any(x => x.Is120MinutePackageAllowed)))
+            .OrderBy(x => x.StartTime)
             .ToList();
-
-        _logger.LogInformation(
-            "Found {Count} available slots for {Date}. PriorityMode={PriorityMode}",
-            finalSlots.Count, requestedDateInPoland.Date, priorityMode);
-
-        return finalSlots;
     }
 
     public async Task<CreateBookingResponseDto> CreateBookingAsync(
@@ -216,7 +307,12 @@ public class BookingService : IBookingService
 
         var isSlotAvailable = availableSlots.Any(slot =>
             slot.StartTime == dto.StartTime &&
-            slot.MaxAvailableDurationMinutes >= requestedTotalBlockedDuration);
+            (requestedTotalBlockedDuration switch
+            {
+                Group1TotalBlockedDurationMinutes => slot.Is90MinutePackageAllowed,
+                Group2TotalBlockedDurationMinutes => slot.Is120MinutePackageAllowed,
+                _ => false
+            }));
 
         if (!isSlotAvailable)
         {
@@ -349,112 +445,6 @@ public class BookingService : IBookingService
         return gaps.Where(g => g.DurationMinutes > 0).ToList();
     }
 
-    private static void AddMagneticCandidatesForGap(
-        Gap gap,
-        DateTimeOffset latestStartUtc,
-        Dictionary<DateTimeOffset, int> slotCandidates)
-    {
-        if (gap.DurationMinutes < Group1TotalBlockedDurationMinutes)
-        {
-            return;
-        }
-
-        // Candidate touching the left edge.
-        var leftCandidate = gap.Start;
-        if (leftCandidate <= latestStartUtc)
-        {
-            var maxLeft = EvaluateCandidateInGap(leftCandidate, gap, mustBeMagnetic: true);
-            if (maxLeft > 0)
-            {
-                AddOrUpdateCandidate(slotCandidates, leftCandidate, maxLeft);
-            }
-        }
-
-        // Candidates touching the right edge.
-        var rightCandidate120 = gap.End.AddMinutes(-Group2TotalBlockedDurationMinutes);
-        if (rightCandidate120 >= gap.Start && rightCandidate120 <= latestStartUtc)
-        {
-            var maxRight120 = EvaluateCandidateInGap(rightCandidate120, gap, mustBeMagnetic: true);
-            if (maxRight120 > 0)
-            {
-                AddOrUpdateCandidate(slotCandidates, rightCandidate120, maxRight120);
-            }
-        }
-
-        var rightCandidate90 = gap.End.AddMinutes(-Group1TotalBlockedDurationMinutes);
-        if (rightCandidate90 >= gap.Start && rightCandidate90 <= latestStartUtc)
-        {
-            var maxRight90 = EvaluateCandidateInGap(rightCandidate90, gap, mustBeMagnetic: true);
-            if (maxRight90 > 0)
-            {
-                AddOrUpdateCandidate(slotCandidates, rightCandidate90, maxRight90);
-            }
-        }
-    }
-
-    private static int EvaluateCandidateInGap(DateTimeOffset candidateStartUtc, Gap gap, bool mustBeMagnetic)
-    {
-        if (candidateStartUtc < gap.Start || candidateStartUtc >= gap.End)
-        {
-            return 0;
-        }
-
-        bool canFit120 = candidateStartUtc.AddMinutes(Group2TotalBlockedDurationMinutes) <= gap.End;
-        bool canFit90 = candidateStartUtc.AddMinutes(Group1TotalBlockedDurationMinutes) <= gap.End;
-
-        if (!canFit120 && !canFit90)
-        {
-            return 0;
-        }
-
-        int gapBefore = (int)(candidateStartUtc - gap.Start).TotalMinutes;
-        if (!IsGapFillable(gapBefore))
-        {
-            return 0;
-        }
-
-        if (canFit120)
-        {
-            var end120 = candidateStartUtc.AddMinutes(Group2TotalBlockedDurationMinutes);
-            int gapAfter120 = (int)(gap.End - end120).TotalMinutes;
-
-            bool touchesEdge120 = candidateStartUtc == gap.Start || end120 == gap.End;
-            if ((!mustBeMagnetic || touchesEdge120) && IsGapFillable(gapAfter120))
-            {
-                return Group2TotalBlockedDurationMinutes;
-            }
-        }
-
-        if (canFit90)
-        {
-            var end90 = candidateStartUtc.AddMinutes(Group1TotalBlockedDurationMinutes);
-            int gapAfter90 = (int)(gap.End - end90).TotalMinutes;
-
-            bool touchesEdge90 = candidateStartUtc == gap.Start || end90 == gap.End;
-            if ((!mustBeMagnetic || touchesEdge90) && IsGapFillable(gapAfter90))
-            {
-                return Group1TotalBlockedDurationMinutes;
-            }
-        }
-
-        return 0;
-    }
-
-    private static void AddOrUpdateCandidate(Dictionary<DateTimeOffset, int> slotCandidates, DateTimeOffset startUtc, int duration)
-    {
-        if (slotCandidates.TryGetValue(startUtc, out var existing))
-        {
-            if (duration > existing)
-            {
-                slotCandidates[startUtc] = duration;
-            }
-
-            return;
-        }
-
-        slotCandidates[startUtc] = duration;
-    }
-
     private static List<(DateTimeOffset Start, DateTimeOffset End)> MergeBusyPeriods(
         List<(DateTimeOffset Start, DateTimeOffset End)> periods)
     {
@@ -480,8 +470,9 @@ public class BookingService : IBookingService
         return merged;
     }
 
-    private static bool IsGapFillable(int minutes)
+    private static bool IsGapFillable(int minutes, bool isBoundaryGap = false)
     {
+        if (isBoundaryGap) return true;
         if (minutes == 0) return true;
         if (minutes < 90) return false;
         if (minutes == 150) return false;

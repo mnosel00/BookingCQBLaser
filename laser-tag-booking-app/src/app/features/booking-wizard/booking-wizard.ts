@@ -199,8 +199,19 @@ export class BookingWizard {
   }
 
   isPackageDisabled(pkg: PackageDetails): boolean {
-    return this.selectedSlot !== null
-      && this.selectedSlot.maxAvailableDurationMinutes < pkg.requiredDurationMinutes;
+    if (this.selectedSlot === null) {
+      return false;
+    }
+
+    if (pkg.requiredDurationMinutes === 90) {
+      return !this.selectedSlot.is90MinutePackageAllowed;
+    }
+
+    if (pkg.requiredDurationMinutes === 120) {
+      return !this.selectedSlot.is120MinutePackageAllowed;
+    }
+
+    return true;
   }
 
   previousStep(): void {
@@ -311,7 +322,7 @@ export class BookingWizard {
 
       if (
         selectedPackageDetails
-        && slot.maxAvailableDurationMinutes < selectedPackageDetails.requiredDurationMinutes
+        && this.isPackageDisabled(selectedPackageDetails)
       ) {
         this.selectedPackage = null;
 
