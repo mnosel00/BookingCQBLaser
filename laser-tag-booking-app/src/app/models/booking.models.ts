@@ -12,6 +12,7 @@ export enum PackageType {
 export interface TimeSlot {
   startTime: string;
   endTime: string;
+  maxAvailableDurationMinutes: number;
 }
 
 export interface CreateBookingRequest {

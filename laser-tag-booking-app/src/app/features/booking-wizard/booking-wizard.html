@@ -9,8 +9,8 @@
       <div class="progress-bar__fill" [style.width.%]="progressPercent"></div>
     </div>
     <div class="progress-bar__labels">
-      <span [class.active]="currentStep >= 1">1. Pakiet</span>
-      <span [class.active]="currentStep >= 2">2. Termin</span>
+      <span [class.active]="currentStep >= 1">1. Termin</span>
+      <span [class.active]="currentStep >= 2">2. Pakiet</span>
       <span [class.active]="currentStep >= 3">3. Dane</span>
     </div>
   </div>
@@ -21,7 +21,58 @@
 
   <!-- STEP 1 -->
   <section *ngIf="currentStep === 1" aria-labelledby="step-1-title">
-    <h2 id="step-1-title">Wybierz pakiet</h2>
+    <h2 id="step-1-title">Wybierz termin</h2>
+
+    <label for="bookingDate">Data</label>
+    <input
+      id="bookingDate"
+      type="date"
+      [min]="minDateValue"
+      [value]="selectedDateValue"
+      (change)="onDateChange(($any($event.target)).value)"
+    />
+
+    <div *ngIf="showPhoneContactWarning" class="error-text error-text--important" style="margin-top: 1rem;">
+      Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199
+    </div>
+
+    <ng-container *ngIf="!showPhoneContactWarning">
+      <p *ngIf="isLoadingSlots" class="loading-text">Ładowanie slotów...</p>
+
+      <ng-container *ngIf="!isLoadingSlots">
+        <ul class="slots-list" *ngIf="availableSlots.length > 0; else noSlots">
+          <li *ngFor="let slot of availableSlots">
+            <button
+              type="button"
+              class="slot-btn"
+              [class.selected]="selectedSlot?.startTime === slot.startTime && selectedSlot?.endTime === slot.endTime"
+              [attr.aria-pressed]="selectedSlot?.startTime === slot.startTime && selectedSlot?.endTime === slot.endTime"
+              (click)="selectSlot(slot)">
+              {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
+            </button>
+          </li>
+        </ul>
+
+        <ng-template #noSlots>
+          <p class="empty-state" *ngIf="selectedDate">Brak dostępnych slotów dla wybranej daty.</p>
+        </ng-template>
+      </ng-container>
+    </ng-container>
+  </section>
+
+  <!-- STEP 2 -->
+  <section *ngIf="currentStep === 2" aria-labelledby="step-2-title">
+    <div class="step-nav">
+      <button type="button" class="btn-back" (click)="previousStep()">Wróć</button>
+      <h2 id="step-2-title">Wybierz pakiet</h2>
+    </div>
+
+    <div class="selected-package-summary" *ngIf="selectedSlot">
+      <span class="summary-label">Wybrany termin:</span>
+      <span class="summary-slot">
+        📅 {{ selectedDate | date:'dd.MM.yyyy' }} 🕐 {{ selectedSlot.startTime | date:'HH:mm' }} – {{ selectedSlot.endTime | date:'HH:mm' }}
+      </span>
+    </div>
 
     <div class="category-toggle" role="tablist" aria-label="Package category">
       <button type="button" role="tab" class="category-toggle__btn"
@@ -42,8 +93,9 @@
       <button type="button" class="package-card"
         *ngFor="let pkg of filteredPackages"
         [class.selected]="selectedPackage === pkg.type"
+        [class.disabled-package]="isPackageDisabled(pkg)"
         [attr.aria-pressed]="selectedPackage === pkg.type"
-        (click)="selectPackage(pkg.type)">
+        (click)="!isPackageDisabled(pkg) && selectPackage(pkg.type)">
 
         <div class="package-card__top">
           <h3>{{ pkg.name }}</h3>
@@ -62,52 +114,12 @@
         <p class="package-card__badge" *ngIf="pkg.minPersons === 10">
           Tylko dla grup min. 10 osób
         </p>
+
+        <p class="package-card__badge package-card__badge--error" *ngIf="isPackageDisabled(pkg)">
+          Za mało czasu o tej godzinie
+        </p>
       </button>
     </div>
-  </section>
-
-  <!-- STEP 2 -->
-  <section *ngIf="currentStep === 2" aria-labelledby="step-2-title">
-    <div class="step-nav">
-      <button type="button" class="btn-back" (click)="previousStep()">Wróć</button>
-      <h2 id="step-2-title">Wybierz termin</h2>
-    </div>
-
-    <div class="selected-package-summary" *ngIf="selectedPackageDetails">
-      <span class="summary-label">Wybrany pakiet:</span>
-      <span class="summary-value">{{ selectedPackageDetails.name }} - {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
-    </div>
-
-    <label for="bookingDate">Data</label>
-    <input
-      id="bookingDate"
-      type="date"
-      [min]="minDateValue"
-      [value]="selectedDateValue"
-      (change)="onDateChange(($any($event.target)).value)"
-    />
-
-    <div *ngIf="showPhoneContactWarning" class="error-text error-text--important" style="margin-top: 1rem;">
-      Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199
-    </div>
-
-    <ng-container *ngIf="!showPhoneContactWarning">
-      <p *ngIf="isLoadingSlots" class="loading-text">Ładowanie slotów...</p>
-
-      <ng-container *ngIf="!isLoadingSlots">
-        <ul *ngIf="availableSlots.length > 0; else noSlots">
-          <li *ngFor="let slot of availableSlots">
-            <button type="button" (click)="selectSlot(slot)">
-              {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
-            </button>
-          </li>
-        </ul>
-
-        <ng-template #noSlots>
-          <p class="empty-state" *ngIf="selectedDate">Brak dostępnych slotów dla wybranej daty.</p>
-        </ng-template>
-      </ng-container>
-    </ng-container>
   </section>
 
   <!-- STEP 3 -->

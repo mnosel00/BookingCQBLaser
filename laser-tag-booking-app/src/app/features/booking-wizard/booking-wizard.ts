@@ -13,6 +13,7 @@ export interface PackageDetails {
   name: string;
   price: number;
   duration: string;
+  requiredDurationMinutes: number;
   features: string[];
   category: 'regular' | 'birthday';
   minPersons?: number;
@@ -54,6 +55,7 @@ export class BookingWizard {
       name: 'S1',
       price: 55,
       duration: '50 min',
+      requiredDurationMinutes: 90,
       category: 'regular',
       features: ['Przygotowanie do gry', '30 min gry (2 gry po 15 min)', '250 strzałów'],
       minPersons: 10
@@ -63,6 +65,7 @@ export class BookingWizard {
       name: 'S2',
       price: 65,
       duration: '60 min',
+      requiredDurationMinutes: 90,
       category: 'regular',
       features: ['Przygotowanie do gry', '40 minut gry (2 gry po 20 min)', '250 strzałów']
     },
@@ -71,6 +74,7 @@ export class BookingWizard {
       name: 'Premium',
       price: 85,
       duration: '70 min',
+      requiredDurationMinutes: 90,
       category: 'regular',
       features: ['Przygotowanie do gry', '50 minut gry (5 gier po 10 min lub 2 gry po 25 min)', 'No limit strzałów']
     },
@@ -79,6 +83,7 @@ export class BookingWizard {
       name: 'Max',
       price: 95,
       duration: '80 min',
+      requiredDurationMinutes: 120,
       category: 'regular',
       features: ['Przygotowanie do gry', '60 minut gry (6 gier po 10 min lub 2 gry po 30 min)', 'No limit strzałów']
     },
@@ -87,6 +92,7 @@ export class BookingWizard {
       name: 'U1',
       price: 55,
       duration: '80 min',
+      requiredDurationMinutes: 120,
       category: 'birthday',
       features: ['Przygotowanie do gry', '30 minut gry (2 gry po 15 min)', '250 strzałów', '30 minut w salce'],
       minPersons: 10
@@ -96,6 +102,7 @@ export class BookingWizard {
       name: 'U2',
       price: 65,
       duration: '90 min',
+      requiredDurationMinutes: 120,
       category: 'birthday',
       features: ['Przygotowanie do gry', '40 minut gry (2 gry po 20 min)', '250 strzałów', '30 minut w salce']
     },
@@ -104,6 +111,7 @@ export class BookingWizard {
       name: 'U3',
       price: 85,
       duration: '100 min',
+      requiredDurationMinutes: 120,
       category: 'birthday',
       features: ['Przygotowanie do gry', '50 minut gry (5 gier po 10 min lub 2 gry po 25 min)', 'No limit strzałów', '30 minut w salce']
     },
@@ -112,6 +120,7 @@ export class BookingWizard {
       name: 'Combat',
       price: 95,
       duration: '110 min',
+      requiredDurationMinutes: 120,
       category: 'birthday',
       features: ['Przygotowanie do gry', '60 minut gry (6 gier po 10 min lub 2 gry po 30 min)', 'No limit strzałów', '30 minut w salce']
     }
@@ -189,9 +198,19 @@ export class BookingWizard {
     this.selectedCategory = cat;
   }
 
+  isPackageDisabled(pkg: PackageDetails): boolean {
+    return this.selectedSlot !== null
+      && this.selectedSlot.maxAvailableDurationMinutes < pkg.requiredDurationMinutes;
+  }
+
   previousStep(): void {
-    if (this.currentStep > 1) {
-      this.currentStep--;
+    if (this.currentStep === 3) {
+      this.currentStep = 2;
+      return;
+    }
+
+    if (this.currentStep === 2) {
+      this.currentStep = 1;
     }
   }
 
@@ -206,14 +225,15 @@ export class BookingWizard {
   }
 
   selectPackage(pkg: PackageType): void {
-    this.selectedPackage = pkg;
-    this.selectedDate = '';
-    this.availableSlots = [];
-    this.selectedSlot = null;
-    this.successMessage = '';
-    this.showPhoneContactWarning = false;
+    const packageDetails = this.packagesList.find(p => p.type === pkg);
+    if (!packageDetails || this.isPackageDisabled(packageDetails)) {
+      return;
+    }
 
-    const minPersons = this.packagesList.find(p => p.type === pkg)?.minPersons ?? 8;
+    this.selectedPackage = pkg;
+    this.successMessage = '';
+
+    const minPersons = packageDetails.minPersons ?? 8;
     const participantsCtrl = this.customerForm.get('participantsCount')!;
     participantsCtrl.setValidators([
       Validators.required,
@@ -222,7 +242,7 @@ export class BookingWizard {
     ]);
     participantsCtrl.updateValueAndValidity();
 
-    this.currentStep = 2;
+    this.currentStep = 3;
   }
 
   isOnlineBookingAllowed(selectedDate: Date): boolean {
@@ -258,9 +278,18 @@ export class BookingWizard {
     this.selectedDate = date;
     this.availableSlots = [];
     this.selectedSlot = null;
+    this.selectedPackage = null;
     this.showPhoneContactWarning = false;
 
-    if (!date || this.selectedPackage === null) return;
+    const participantsCtrl = this.customerForm.get('participantsCount')!;
+    participantsCtrl.setValidators([
+      Validators.required,
+      Validators.min(8),
+      Validators.max(26)
+    ]);
+    participantsCtrl.updateValueAndValidity();
+
+    if (!date) return;
 
     if (!this.isOnlineBookingAllowed(new Date(date))) {
       this.showPhoneContactWarning = true;
@@ -268,7 +297,7 @@ export class BookingWizard {
     }
 
     this.isLoadingSlots = true;
-    this.bookingApiService.getAvailableSlots(date, this.selectedPackage).subscribe({
+    this.bookingApiService.getAvailableSlots(date).subscribe({
       next: (slots) => { this.availableSlots = slots; this.isLoadingSlots = false; },
       error: () => { this.isLoadingSlots = false; window.alert('Could not load available time slots.'); }
     });
@@ -276,7 +305,27 @@ export class BookingWizard {
 
   selectSlot(slot: TimeSlot): void {
     this.selectedSlot = slot;
-    this.currentStep = 3;
+
+    if (this.selectedPackage !== null) {
+      const selectedPackageDetails = this.packagesList.find(p => p.type === this.selectedPackage);
+
+      if (
+        selectedPackageDetails
+        && slot.maxAvailableDurationMinutes < selectedPackageDetails.requiredDurationMinutes
+      ) {
+        this.selectedPackage = null;
+
+        const participantsCtrl = this.customerForm.get('participantsCount')!;
+        participantsCtrl.setValidators([
+          Validators.required,
+          Validators.min(8),
+          Validators.max(26)
+        ]);
+        participantsCtrl.updateValueAndValidity();
+      }
+    }
+
+    this.currentStep = 2;
   }
 
   submitBooking(): void {

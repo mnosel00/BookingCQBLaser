@@ -259,6 +259,17 @@ h2 {
     background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
     box-shadow: 0 0 0 4px var(--ring), 0 16px 30px rgba(79, 70, 229, 0.2);
   }
+
+}
+
+.disabled-package {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+  cursor: not-allowed;
+  pointer-events: none;
+  border-color: #cbd5e1;
+  box-shadow: none;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 .package-card__top {
@@ -339,6 +350,12 @@ h2 {
   white-space: normal; 
 }
 
+.package-card__badge--error {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
 /* Step 2 & 3 General Elements */
 .selected-package-summary {
   display: flex;
@@ -383,7 +400,7 @@ input[type='date'], input[type='text'], input[type='email'], input[type='tel'], 
   box-sizing: border-box;
 }
 
-section[aria-labelledby='step-2-title'] ul {
+.slots-list {
   margin: 1rem 0 0;
   padding: 0;
   list-style: none;
@@ -395,7 +412,7 @@ section[aria-labelledby='step-2-title'] ul {
   @media (min-width: 480px) { grid-template-columns: repeat(3, 1fr); }
 }
 
-section[aria-labelledby='step-2-title'] li button {
+.slot-btn {
   width: 100%;
   background: #ffffff;
   border: 1px solid #cbd5e1;
@@ -409,6 +426,13 @@ section[aria-labelledby='step-2-title'] li button {
     border-color: var(--primary);
     background: var(--primary);
     color: #ffffff;
+  }
+
+  &.selected {
+    border-color: var(--primary);
+    background: #eef2ff;
+    color: #312e81;
+    box-shadow: 0 0 0 3px var(--ring);
   }
 }
 
