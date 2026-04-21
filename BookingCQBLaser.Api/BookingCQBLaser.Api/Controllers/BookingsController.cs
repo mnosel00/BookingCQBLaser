@@ -1,6 +1,5 @@
 ﻿using BookingCQBLaser.Application.DTOs;
 using BookingCQBLaser.Application.Services;
-using BookingCQBLaser.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading;
@@ -22,10 +21,9 @@ public class BookingsController : ControllerBase
     [HttpGet("available-slots")]
     public async Task<IActionResult> GetAvailableSlots(
         [FromQuery] DateTimeOffset date,
-        [FromQuery] PackageType package,
         CancellationToken cancellationToken)
     {
-        var slots = await _bookingService.GetAvailableTimeSlotsAsync(date, package, cancellationToken);
+        var slots = await _bookingService.GetAvailableTimeSlotsAsync(date, cancellationToken);
         return Ok(slots);
     }
 
@@ -35,7 +33,6 @@ public class BookingsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _bookingService.CreateBookingAsync(dto, cancellationToken);
-        // Correctly return the DTO object containing BookingId and PaymentUrl
         return Ok(result);
     }
 }

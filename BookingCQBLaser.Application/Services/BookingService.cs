@@ -16,8 +16,10 @@ namespace BookingCQBLaser.Application.Services;
 public class BookingService : IBookingService
 {
     private const int TurnaroundBufferMinutes = 30;
-    private const int SlotIntervalMinutes = 10;
+    private const int Group1TotalBlockedDurationMinutes = 90;  // S1, S2, Premium
+    private const int Group2TotalBlockedDurationMinutes = 120; // Max, U1, U2, U3, Combat
     private static readonly TimeOnly ArenaOpenTime = new(8, 0);
+    private static readonly int[] AnchorGridHours = [8, 10, 12, 14, 16, 18, 20];
 
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
@@ -52,14 +54,7 @@ public class BookingService : IBookingService
         }
     }
 
-    private TimeOnly GetLatestStartTime(DateTimeOffset date)
-    {
-        if (date.DayOfWeek == DayOfWeek.Sunday)
-        {
-            return new TimeOnly(15, 0);
-        }
-        return new TimeOnly(22, 0);
-    }
+    private static TimeOnly GetLatestStartTime() => new(21, 0);
 
     private bool IsOnlineBookingAllowed(DateTimeOffset targetDate, DateTimeOffset nowInPoland)
     {
@@ -82,63 +77,111 @@ public class BookingService : IBookingService
 
     public async Task<IEnumerable<TimeSlotDto>> GetAvailableTimeSlotsAsync(
         DateTimeOffset date,
-        PackageType package,
         CancellationToken cancellationToken = default)
     {
         var polandTimeZone = GetPolandTimeZone();
         var nowInPoland = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandTimeZone);
-
         var requestedDateInPoland = TimeZoneInfo.ConvertTimeFromUtc(date.UtcDateTime, polandTimeZone);
 
         if (!IsOnlineBookingAllowed(requestedDateInPoland, nowInPoland))
         {
             _logger.LogInformation("Requested date {Date} is not allowed by booking rules. Returning empty slots.", requestedDateInPoland.Date);
-            return new List<TimeSlotDto>();
+            return [];
         }
 
-        var packageBaseDuration = package.GetBaseDurationMinutes();
-        var totalDurationMinutes = packageBaseDuration + TurnaroundBufferMinutes;
-
-        var dayStart = new DateTimeOffset(
+        var dayStartLocal = new DateTimeOffset(
             date.Year, date.Month, date.Day,
             ArenaOpenTime.Hour, ArenaOpenTime.Minute, 0,
             date.Offset);
 
-        var latestTime = GetLatestStartTime(requestedDateInPoland);
-        var latestStart = new DateTimeOffset(
+        var dayCloseLocal = new DateTimeOffset(
             date.Year, date.Month, date.Day,
-            latestTime.Hour, latestTime.Minute, 0,
+            23, 0, 0,
             date.Offset);
 
-        var dayEnd = dayStart.AddDays(1);
+        var latestStartLocal = new DateTimeOffset(
+            date.Year, date.Month, date.Day,
+            GetLatestStartTime().Hour, GetLatestStartTime().Minute, 0,
+            date.Offset);
 
-        // Convert boundaries to UTC for DB and Google Calendar queries
-        var busyPeriods = await GetCombinedBusyPeriodsAsync(
-            dayStart.ToUniversalTime(), 
-            dayEnd.ToUniversalTime(), 
-            cancellationToken);
+        var dayStartUtc = dayStartLocal.ToUniversalTime();
+        var dayCloseUtc = dayCloseLocal.ToUniversalTime();
+        var latestStartUtc = latestStartLocal.ToUniversalTime();
 
-        var availableSlots = new List<TimeSlotDto>();
-        var currentSlotStart = dayStart;
-
-        while (currentSlotStart <= latestStart)
+        // 1) Fetch local bookings first (hard limit rule)
+        var localBookings = (await _repository.GetByDateRangeAsync(dayStartUtc, dayCloseUtc, cancellationToken)).ToList();
+        if (localBookings.Count >= 7)
         {
-            var currentSlotEnd = currentSlotStart.AddMinutes(totalDurationMinutes);
-
-            if (!OverlapsWithBusyPeriods(currentSlotStart, currentSlotEnd, busyPeriods))
-            {
-                var displaySlotEnd = currentSlotStart.AddMinutes(packageBaseDuration);
-                availableSlots.Add(new TimeSlotDto(currentSlotStart, displaySlotEnd));
-            }
-
-            currentSlotStart = currentSlotStart.AddMinutes(SlotIntervalMinutes);
+            _logger.LogInformation("Day {Date} already has {Count} local bookings (limit: 7). Returning empty slots.", requestedDateInPoland.Date, localBookings.Count);
+            return [];
         }
 
-        _logger.LogInformation(
-            "Found {Count} available slots for {Date} with package {Package}",
-            availableSlots.Count, date.Date, package);
+        // 2) Build merged busy periods (local + Google)
+        var googleBusyPeriods = await _googleCalendarService.GetBusyPeriodsAsync(dayStartUtc, dayCloseUtc, cancellationToken);
 
-        return availableSlots;
+        var busyPeriods = new List<(DateTimeOffset Start, DateTimeOffset End)>();
+        foreach (var booking in localBookings)
+        {
+            if (string.IsNullOrEmpty(booking.GoogleCalendarEventId))
+            {
+                busyPeriods.Add((booking.StartTime, booking.EndTime));
+            }
+        }
+
+        busyPeriods.AddRange(googleBusyPeriods);
+        var mergedBusyPeriods = MergeBusyPeriods(busyPeriods);
+
+        // 3) Build candidate starts using magnetic rules
+        var candidateStarts = BuildCandidateStarts(
+            date,
+            dayStartUtc,
+            latestStartUtc,
+            mergedBusyPeriods);
+
+        // 4) Evaluate each candidate: compute max gap to next busy or 23:00
+        var results = new List<TimeSlotDto>();
+
+        foreach (var candidateStartUtc in candidateStarts.OrderBy(x => x))
+        {
+            if (IsInsideBusyPeriod(candidateStartUtc, mergedBusyPeriods))
+            {
+                continue;
+            }
+
+            var nextBusyStartUtc = mergedBusyPeriods
+                .Where(p => p.Start > candidateStartUtc)
+                .Select(p => p.Start)
+                .DefaultIfEmpty(dayCloseUtc)
+                .Min();
+
+            var boundaryUtc = nextBusyStartUtc < dayCloseUtc ? nextBusyStartUtc : dayCloseUtc;
+            var availableGapMinutes = (int)(boundaryUtc - candidateStartUtc).TotalMinutes;
+
+            int maxAvailableDurationMinutes =
+                availableGapMinutes >= Group2TotalBlockedDurationMinutes ? Group2TotalBlockedDurationMinutes :
+                availableGapMinutes >= Group1TotalBlockedDurationMinutes ? Group1TotalBlockedDurationMinutes :
+                0;
+
+            if (maxAvailableDurationMinutes == 0)
+            {
+                continue;
+            }
+
+            results.Add(new TimeSlotDto(
+                candidateStartUtc.ToOffset(date.Offset),
+                maxAvailableDurationMinutes));
+        }
+
+        var finalSlots = results
+            .DistinctBy(x => x.StartTime)
+            .OrderBy(x => x.StartTime)
+            .ToList();
+
+        _logger.LogInformation(
+            "Found {Count} magnetic slots for {Date}",
+            finalSlots.Count, requestedDateInPoland.Date);
+
+        return finalSlots;
     }
 
     public async Task<CreateBookingResponseDto> CreateBookingAsync(
@@ -154,8 +197,12 @@ public class BookingService : IBookingService
             throw new InvalidOperationException("Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199");
         }
 
-        var availableSlots = await GetAvailableTimeSlotsAsync(dto.StartTime, dto.Package, cancellationToken);
-        var isSlotAvailable = availableSlots.Any(slot => slot.StartTime == dto.StartTime);
+        var availableSlots = await GetAvailableTimeSlotsAsync(dto.StartTime, cancellationToken);
+        var requestedTotalBlockedDuration = dto.Package.GetBaseDurationMinutes() + TurnaroundBufferMinutes;
+
+        var isSlotAvailable = availableSlots.Any(slot =>
+            slot.StartTime == dto.StartTime &&
+            slot.MaxAvailableDurationMinutes >= requestedTotalBlockedDuration);
 
         if (!isSlotAvailable)
         {
@@ -171,14 +218,14 @@ public class BookingService : IBookingService
             dto.Email,
             dto.Phone);
 
-        var totalBlockedDurationMinutes = dto.Package.GetBaseDurationMinutes() + TurnaroundBufferMinutes;
+        var totalBlockedDurationMinutes = requestedTotalBlockedDuration;
 
         // Ensure StartTime is converted to UTC to satisfy Npgsql
         var booking = new Booking(
             customerInfo,
             dto.ParticipantsCount,
             dto.Package,
-            dto.StartTime.ToUniversalTime(), 
+            dto.StartTime.ToUniversalTime(),
             totalBlockedDurationMinutes);
 
         await _repository.AddAsync(booking, cancellationToken);
@@ -247,31 +294,37 @@ public class BookingService : IBookingService
         }
     }
 
-    private async Task<List<(DateTimeOffset Start, DateTimeOffset End)>> GetCombinedBusyPeriodsAsync(
-        DateTimeOffset dayStart,
-        DateTimeOffset dayEnd,
-        CancellationToken cancellationToken)
+    private static HashSet<DateTimeOffset> BuildCandidateStarts(
+        DateTimeOffset requestedDate,
+        DateTimeOffset dayStartUtc,
+        DateTimeOffset latestStartUtc,
+        List<(DateTimeOffset Start, DateTimeOffset End)> mergedBusyPeriods)
     {
-        var localBookingsTask = _repository.GetByDateRangeAsync(dayStart, dayEnd, cancellationToken);
-        var googleBusyPeriodsTask = _googleCalendarService.GetBusyPeriodsAsync(dayStart, dayEnd, cancellationToken);
+        var candidates = new HashSet<DateTimeOffset>();
 
-        await Task.WhenAll(localBookingsTask, googleBusyPeriodsTask);
-
-        var localBookings = await localBookingsTask;
-        var googleBusyPeriods = await googleBusyPeriodsTask;
-
-        var busyPeriods = new List<(DateTimeOffset Start, DateTimeOffset End)>();
-
-        foreach (var booking in localBookings)
+        if (mergedBusyPeriods.Count == 0)
         {
-            if (string.IsNullOrEmpty(booking.GoogleCalendarEventId))
+            foreach (var hour in AnchorGridHours)
             {
-                busyPeriods.Add((booking.StartTime, booking.EndTime));
+                var anchorLocal = new DateTimeOffset(
+                    requestedDate.Year, requestedDate.Month, requestedDate.Day,
+                    hour, 0, 0,
+                    requestedDate.Offset);
+
+                candidates.Add(anchorLocal.ToUniversalTime());
             }
         }
 
-        busyPeriods.AddRange(googleBusyPeriods);
-        return MergeBusyPeriods(busyPeriods);
+        foreach (var busy in mergedBusyPeriods)
+        {
+            candidates.Add(busy.End);
+            candidates.Add(busy.Start.AddMinutes(-Group1TotalBlockedDurationMinutes));
+            candidates.Add(busy.Start.AddMinutes(-Group2TotalBlockedDurationMinutes));
+        }
+
+        candidates.RemoveWhere(c => c < dayStartUtc || c > latestStartUtc);
+
+        return candidates;
     }
 
     private static List<(DateTimeOffset Start, DateTimeOffset End)> MergeBusyPeriods(
@@ -299,18 +352,18 @@ public class BookingService : IBookingService
         return merged;
     }
 
-    private static bool OverlapsWithBusyPeriods(
-        DateTimeOffset slotStart,
-        DateTimeOffset slotEnd,
+    private static bool IsInsideBusyPeriod(
+        DateTimeOffset instant,
         List<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods)
     {
         foreach (var (busyStart, busyEnd) in busyPeriods)
         {
-            if (slotStart < busyEnd && slotEnd > busyStart)
+            if (instant >= busyStart && instant < busyEnd)
             {
                 return true;
             }
         }
+
         return false;
     }
 }

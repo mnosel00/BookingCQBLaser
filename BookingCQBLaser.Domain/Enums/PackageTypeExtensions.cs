@@ -12,17 +12,18 @@ namespace BookingCQBLaser.Domain.Enums
         {
             return package switch
             {
-                PackageType.S1 => 50,
+                PackageType.S1 => 60,
                 PackageType.S2 => 60,
-                PackageType.Premium => 70,
-                PackageType.Max => 80,
-                PackageType.U1 => 80,
+                PackageType.Premium => 60,
+                PackageType.Max => 90,
+                PackageType.U1 => 90,
                 PackageType.U2 => 90,
-                PackageType.U3 => 100,
-                PackageType.Combat => 110,
+                PackageType.U3 => 90,
+                PackageType.Combat => 90,
                 _ => throw new ArgumentOutOfRangeException(nameof(package), package, null)
             };
         }
+
         public static int GetPrice(this PackageType package)
         {
             return package switch
