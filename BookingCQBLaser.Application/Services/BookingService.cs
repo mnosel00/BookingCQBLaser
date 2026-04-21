@@ -91,7 +91,7 @@ public class BookingService : IBookingService
 
         var dayStartLocal = new DateTimeOffset(
             date.Year, date.Month, date.Day,
-            ArenaOpenTime.Hour, ArenaOpenTime.Minute, 0,
+            8, 0, 0,
             date.Offset);
 
         var dayCloseLocal = new DateTimeOffset(
@@ -108,15 +108,16 @@ public class BookingService : IBookingService
         var dayCloseUtc = dayCloseLocal.ToUniversalTime();
         var latestStartUtc = latestStartLocal.ToUniversalTime();
 
-        // 1) Fetch local bookings first (hard limit rule)
+        // Hard daily limit based on local bookings only.
         var localBookings = (await _repository.GetByDateRangeAsync(dayStartUtc, dayCloseUtc, cancellationToken)).ToList();
         if (localBookings.Count >= 7)
         {
-            _logger.LogInformation("Day {Date} already has {Count} local bookings (limit: 7). Returning empty slots.", requestedDateInPoland.Date, localBookings.Count);
+            _logger.LogInformation(
+                "Day {Date} already has {Count} local bookings (limit: 7). Returning empty slots.",
+                requestedDateInPoland.Date, localBookings.Count);
             return [];
         }
 
-        // 2) Build merged busy periods (local + Google)
         var googleBusyPeriods = await _googleCalendarService.GetBusyPeriodsAsync(dayStartUtc, dayCloseUtc, cancellationToken);
 
         var busyPeriods = new List<(DateTimeOffset Start, DateTimeOffset End)>();
@@ -129,59 +130,76 @@ public class BookingService : IBookingService
         }
 
         busyPeriods.AddRange(googleBusyPeriods);
-        var mergedBusyPeriods = MergeBusyPeriods(busyPeriods);
 
-        // 3) Build candidate starts using magnetic rules
-        var candidateStarts = BuildCandidateStarts(
-            date,
-            dayStartUtc,
-            latestStartUtc,
-            mergedBusyPeriods);
+        // Keep only periods intersecting the day and clamp them to [08:00, 23:00].
+        var mergedBusyPeriods = MergeBusyPeriods(
+            busyPeriods
+                .Where(p => p.End > dayStartUtc && p.Start < dayCloseUtc)
+                .Select(p => (
+                    Start: p.Start < dayStartUtc ? dayStartUtc : p.Start,
+                    End: p.End > dayCloseUtc ? dayCloseUtc : p.End))
+                .ToList());
 
-        // 4) Evaluate each candidate: compute max gap to next busy or 23:00
-        var results = new List<TimeSlotDto>();
+        var slots = new List<TimeSlotDto>();
 
-        foreach (var candidateStartUtc in candidateStarts.OrderBy(x => x))
+        for (var currentSlotStartUtc = dayStartUtc;
+             currentSlotStartUtc <= latestStartUtc;
+             currentSlotStartUtc = currentSlotStartUtc.AddMinutes(30))
         {
-            if (IsInsideBusyPeriod(candidateStartUtc, mergedBusyPeriods))
+            // Candidate cannot start inside an existing busy period.
+            if (mergedBusyPeriods.Any(p => currentSlotStartUtc >= p.Start && currentSlotStartUtc < p.End))
             {
                 continue;
             }
 
-            var nextBusyStartUtc = mergedBusyPeriods
-                .Where(p => p.Start > candidateStartUtc)
-                .Select(p => p.Start)
-                .DefaultIfEmpty(dayCloseUtc)
-                .Min();
+            // Gap before: previous busy end -> current start (or 08:00 -> current start).
+            var previousBoundaryUtc = dayStartUtc;
+            foreach (var period in mergedBusyPeriods)
+            {
+                if (period.End <= currentSlotStartUtc && period.End > previousBoundaryUtc)
+                {
+                    previousBoundaryUtc = period.End;
+                }
+            }
 
-            var boundaryUtc = nextBusyStartUtc < dayCloseUtc ? nextBusyStartUtc : dayCloseUtc;
-            var availableGapMinutes = (int)(boundaryUtc - candidateStartUtc).TotalMinutes;
-
-            int maxAvailableDurationMinutes =
-                availableGapMinutes >= Group2TotalBlockedDurationMinutes ? Group2TotalBlockedDurationMinutes :
-                availableGapMinutes >= Group1TotalBlockedDurationMinutes ? Group1TotalBlockedDurationMinutes :
-                0;
-
-            if (maxAvailableDurationMinutes == 0)
+            var gapBeforeMinutes = (int)(currentSlotStartUtc - previousBoundaryUtc).TotalMinutes;
+            if (!IsGapFillable(gapBeforeMinutes))
             {
                 continue;
             }
 
-            results.Add(new TimeSlotDto(
-                candidateStartUtc.ToOffset(date.Offset),
-                maxAvailableDurationMinutes));
+            // Space ahead: current start -> next busy start (or 23:00).
+            var nextBoundaryUtc = dayCloseUtc;
+            foreach (var period in mergedBusyPeriods)
+            {
+                if (period.Start > currentSlotStartUtc && period.Start < nextBoundaryUtc)
+                {
+                    nextBoundaryUtc = period.Start;
+                }
+            }
+
+            var spaceAheadMinutes = (int)(nextBoundaryUtc - currentSlotStartUtc).TotalMinutes;
+
+            bool fits120 = spaceAheadMinutes >= Group2TotalBlockedDurationMinutes &&
+                           IsGapFillable(spaceAheadMinutes - Group2TotalBlockedDurationMinutes);
+
+            bool fits90 = spaceAheadMinutes >= Group1TotalBlockedDurationMinutes &&
+                          IsGapFillable(spaceAheadMinutes - Group1TotalBlockedDurationMinutes);
+
+            if (fits120)
+            {
+                slots.Add(new TimeSlotDto(currentSlotStartUtc.ToOffset(date.Offset), Group2TotalBlockedDurationMinutes));
+            }
+            else if (fits90)
+            {
+                slots.Add(new TimeSlotDto(currentSlotStartUtc.ToOffset(date.Offset), Group1TotalBlockedDurationMinutes));
+            }
         }
 
-        var finalSlots = results
+        return slots
             .DistinctBy(x => x.StartTime)
             .OrderBy(x => x.StartTime)
             .ToList();
-
-        _logger.LogInformation(
-            "Found {Count} magnetic slots for {Date}",
-            finalSlots.Count, requestedDateInPoland.Date);
-
-        return finalSlots;
     }
 
     public async Task<CreateBookingResponseDto> CreateBookingAsync(
@@ -294,38 +312,7 @@ public class BookingService : IBookingService
         }
     }
 
-    private static HashSet<DateTimeOffset> BuildCandidateStarts(
-        DateTimeOffset requestedDate,
-        DateTimeOffset dayStartUtc,
-        DateTimeOffset latestStartUtc,
-        List<(DateTimeOffset Start, DateTimeOffset End)> mergedBusyPeriods)
-    {
-        var candidates = new HashSet<DateTimeOffset>();
-
-        if (mergedBusyPeriods.Count == 0)
-        {
-            foreach (var hour in AnchorGridHours)
-            {
-                var anchorLocal = new DateTimeOffset(
-                    requestedDate.Year, requestedDate.Month, requestedDate.Day,
-                    hour, 0, 0,
-                    requestedDate.Offset);
-
-                candidates.Add(anchorLocal.ToUniversalTime());
-            }
-        }
-
-        foreach (var busy in mergedBusyPeriods)
-        {
-            candidates.Add(busy.End);
-            candidates.Add(busy.Start.AddMinutes(-Group1TotalBlockedDurationMinutes));
-            candidates.Add(busy.Start.AddMinutes(-Group2TotalBlockedDurationMinutes));
-        }
-
-        candidates.RemoveWhere(c => c < dayStartUtc || c > latestStartUtc);
-
-        return candidates;
-    }
+    
 
     private static List<(DateTimeOffset Start, DateTimeOffset End)> MergeBusyPeriods(
         List<(DateTimeOffset Start, DateTimeOffset End)> periods)
@@ -352,18 +339,12 @@ public class BookingService : IBookingService
         return merged;
     }
 
-    private static bool IsInsideBusyPeriod(
-        DateTimeOffset instant,
-        List<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods)
-    {
-        foreach (var (busyStart, busyEnd) in busyPeriods)
-        {
-            if (instant >= busyStart && instant < busyEnd)
-            {
-                return true;
-            }
-        }
 
-        return false;
+    private static bool IsGapFillable(int minutes)
+    {
+        if (minutes == 0) return true;
+        if (minutes < 90) return false;
+        if (minutes == 150) return false;
+        return minutes % 30 == 0;
     }
 }
