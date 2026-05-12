@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 namespace BookingCQBLaser.Application.DTOs
 {
     public record TimeSlotDto(
-    DateTimeOffset StartTime,
-    DateTimeOffset EndTime);
+        DateTimeOffset StartTime,
+        DateTimeOffset EndTime,
+        int MaxAvailableDurationMinutes)
+    {
+        public bool CanAccommodateLongPackages => MaxAvailableDurationMinutes >= 120;
+    }
 }

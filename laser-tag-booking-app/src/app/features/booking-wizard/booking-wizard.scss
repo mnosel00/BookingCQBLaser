@@ -412,6 +412,109 @@ section[aria-labelledby='step-2-title'] li button {
   }
 }
 
+/* Incompatible slots styling */
+.incompatible-slots-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px dashed #fca5a5;
+  border-radius: 12px;
+  background: #fef2f2;
+}
+
+.incompatible-slots-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #991b1b;
+}
+
+.incompatible-slots-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+
+  @media (min-width: 320px) { grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 480px) { grid-template-columns: repeat(3, 1fr); }
+}
+
+.incompatible-slot-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.slot-btn--incompatible {
+  width: 100%;
+  background: #fecaca;
+  border: 2px dashed #fca5a5;
+  border-radius: 999px;
+  padding: 0.75rem 0.25rem;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #7f1d1d;
+  cursor: not-allowed;
+  opacity: 0.65;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
+  transition: all 0.2s ease;
+
+  &:hover {
+    opacity: 0.65;
+    border-color: #fca5a5;
+    background: #fecaca;
+  }
+
+  &:disabled {
+    opacity: 0.65;
+  }
+}
+
+.slot-hint {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.slot-tooltip {
+  display: none;
+  position: absolute;
+  bottom: -55px;
+  left: 0;
+  background: #7f1d1d;
+  color: #ffffff;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  width: max-content;
+  max-width: 200px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+
+  @media (min-width: 480px) {
+    bottom: auto;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 0.5rem;
+  }
+}
+
+.incompatible-slot-item:hover .slot-tooltip {
+  display: block;
+}
+
 .loading-text, .empty-state {
   margin-top: 0.75rem;
   padding: 0.8rem;
@@ -576,5 +679,37 @@ button[type='submit'] {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 4px var(--ring);
+  }
+}
+
+/* Checkbox and link styling */
+.disabled-checkbox {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hint-text {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.terms-link {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: rgba(79, 70, 229, 0.4);
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    text-decoration-color: var(--primary);
+    color: #6366f1;
+  }
+
+  &:active {
+    color: #4f46e5;
   }
 }

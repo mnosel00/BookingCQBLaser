@@ -12,6 +12,22 @@ namespace BookingCQBLaser.Domain.Enums
         {
             return package switch
             {
+                PackageType.S1 => 90,
+                PackageType.S2 => 90,
+                PackageType.Premium => 120,
+                PackageType.Max => 120,
+                PackageType.U1 => 90,
+                PackageType.U2 => 120,
+                PackageType.U3 => 120,
+                PackageType.Combat => 120,
+                _ => throw new ArgumentOutOfRangeException(nameof(package), package, null)
+            };
+        }
+
+        public static int GetClientGameDurationMinutes(this PackageType package)
+        {
+            return package switch
+            {
                 PackageType.S1 => 50,
                 PackageType.S2 => 60,
                 PackageType.Premium => 70,
@@ -23,6 +39,7 @@ namespace BookingCQBLaser.Domain.Enums
                 _ => throw new ArgumentOutOfRangeException(nameof(package), package, null)
             };
         }
+
         public static int GetPrice(this PackageType package)
         {
             return package switch

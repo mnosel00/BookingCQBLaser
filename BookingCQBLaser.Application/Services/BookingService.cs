@@ -15,9 +15,11 @@ namespace BookingCQBLaser.Application.Services;
 
 public class BookingService : IBookingService
 {
-    private const int TurnaroundBufferMinutes = 30;
-    private const int SlotIntervalMinutes = 10;
+    private const int SlotIntervalMinutes = 30;
+    private const int MinimumSlotCapacityMinutes = 90;
+    private const int LongPackageMinimumMinutes = 120;
     private static readonly TimeOnly ArenaOpenTime = new(8, 0);
+    private static readonly TimeOnly ArenaCloseTime = new(23, 0);
 
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
@@ -52,15 +54,6 @@ public class BookingService : IBookingService
         }
     }
 
-    private TimeOnly GetLatestStartTime(DateTimeOffset date)
-    {
-        if (date.DayOfWeek == DayOfWeek.Sunday)
-        {
-            return new TimeOnly(15, 0);
-        }
-        return new TimeOnly(22, 0);
-    }
-
     private bool IsOnlineBookingAllowed(DateTimeOffset targetDate, DateTimeOffset nowInPoland)
     {
         if (targetDate.Date < nowInPoland.Date) return false;
@@ -80,10 +73,11 @@ public class BookingService : IBookingService
         return targetDate.Date >= nowInPoland.Date.AddDays(3);
     }
 
+
     public async Task<IEnumerable<TimeSlotDto>> GetAvailableTimeSlotsAsync(
-        DateTimeOffset date,
-        PackageType package,
-        CancellationToken cancellationToken = default)
+         DateTimeOffset date,
+         PackageType package,
+         CancellationToken cancellationToken = default)
     {
         var polandTimeZone = GetPolandTimeZone();
         var nowInPoland = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandTimeZone);
@@ -97,53 +91,137 @@ public class BookingService : IBookingService
         }
 
         var packageBaseDuration = package.GetBaseDurationMinutes();
-        var totalDurationMinutes = packageBaseDuration + TurnaroundBufferMinutes;
+        var clientGameDuration = package.GetClientGameDurationMinutes();
 
         var dayStart = new DateTimeOffset(
             date.Year, date.Month, date.Day,
             ArenaOpenTime.Hour, ArenaOpenTime.Minute, 0,
             date.Offset);
 
-        var latestTime = GetLatestStartTime(requestedDateInPoland);
-        var latestStart = new DateTimeOffset(
+        var dayEnd = new DateTimeOffset(
             date.Year, date.Month, date.Day,
-            latestTime.Hour, latestTime.Minute, 0,
+            ArenaCloseTime.Hour, ArenaCloseTime.Minute, 0,
             date.Offset);
-
-        var dayEnd = dayStart.AddDays(1);
 
         // Convert boundaries to UTC for DB and Google Calendar queries
         var busyPeriods = await GetCombinedBusyPeriodsAsync(
-            dayStart.ToUniversalTime(), 
-            dayEnd.ToUniversalTime(), 
+            dayStart.ToUniversalTime(),
+            dayEnd.ToUniversalTime(),
             cancellationToken);
 
+        // Get free windows between busy periods
+        var freeWindows = GetFreeWindows(dayStart, dayEnd, busyPeriods);
+
+        // Generate slots for each free window
         var availableSlots = new List<TimeSlotDto>();
-        var currentSlotStart = dayStart;
-
-        while (currentSlotStart <= latestStart)
+        foreach (var (windowStart, windowEnd) in freeWindows)
         {
-            var currentSlotEnd = currentSlotStart.AddMinutes(totalDurationMinutes);
-
-            if (!OverlapsWithBusyPeriods(currentSlotStart, currentSlotEnd, busyPeriods))
-            {
-                var displaySlotEnd = currentSlotStart.AddMinutes(packageBaseDuration);
-                availableSlots.Add(new TimeSlotDto(currentSlotStart, displaySlotEnd));
-            }
-
-            currentSlotStart = currentSlotStart.AddMinutes(SlotIntervalMinutes);
+            var windowSlots = GenerateSlotsForWindow(windowStart, windowEnd, packageBaseDuration, clientGameDuration);
+            availableSlots.AddRange(windowSlots);
         }
 
         _logger.LogInformation(
-            "Found {Count} available slots for {Date} with package {Package}",
-            availableSlots.Count, date.Date, package);
+            "Found {Count} available slots for {Date} with package {Package} across {WindowCount} free windows",
+            availableSlots.Count, date.Date, package, freeWindows.Count);
 
         return availableSlots;
     }
 
+    private List<(DateTimeOffset Start, DateTimeOffset End)> GetFreeWindows(
+        DateTimeOffset dayStart,
+        DateTimeOffset dayEnd,
+        List<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods)
+    {
+        var freeWindows = new List<(DateTimeOffset Start, DateTimeOffset End)>();
+
+        if (busyPeriods.Count == 0)
+        {
+            freeWindows.Add((dayStart, dayEnd));
+            return freeWindows;
+        }
+
+        // Window before first busy period
+        if (dayStart < busyPeriods[0].Start)
+        {
+            freeWindows.Add((dayStart, busyPeriods[0].Start));
+        }
+
+        // Windows between consecutive busy periods
+        for (int i = 0; i < busyPeriods.Count - 1; i++)
+        {
+            var windowStart = busyPeriods[i].End;
+            var windowEnd = busyPeriods[i + 1].Start;
+
+            if (windowStart < windowEnd)
+            {
+                freeWindows.Add((windowStart, windowEnd));
+            }
+        }
+
+        // Window after last busy period
+        if (busyPeriods[^1].End < dayEnd)
+        {
+            freeWindows.Add((busyPeriods[^1].End, dayEnd));
+        }
+
+        return freeWindows;
+    }
+
+    private List<TimeSlotDto> GenerateSlotsForWindow(
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        int packageBaseDuration,
+        int clientGameDuration)
+    {
+        var slots = new List<TimeSlotDto>();
+        int windowDurationMinutes = (int)(windowEnd - windowStart).TotalMinutes;
+
+        // Skip windows too small for minimum package (90 minutes)
+        if (windowDurationMinutes < MinimumSlotCapacityMinutes)
+        {
+            return slots;
+        }
+
+        var currentSlotStart = windowStart;
+        var latestStart = windowEnd.AddMinutes(-packageBaseDuration);
+
+        while (currentSlotStart <= latestStart)
+        {
+            var slotEnd = currentSlotStart.AddMinutes(packageBaseDuration);
+            var displaySlotEnd = currentSlotStart.AddMinutes(clientGameDuration);
+            int maxAvailableDuration = (int)(windowEnd - currentSlotStart).TotalMinutes;
+
+            // Capacity verification: mark if window can only accommodate short packages (90 min)
+            // The CanAccommodateLongPackages property handles this in the DTO
+
+            slots.Add(new TimeSlotDto(currentSlotStart, displaySlotEnd, maxAvailableDuration));
+
+            var nextSlotStart = currentSlotStart.AddMinutes(SlotIntervalMinutes);
+
+            // Slot pushing optimization: avoid creating unsaleable 30-minute gaps
+            // If the next slot would leave less than MinimumSlotCapacityMinutes after the current slot,
+            // and current slot is not at window boundary, skip to next interval
+            int remainingAfterNextSlot = (int)(windowEnd - nextSlotStart).TotalMinutes;
+            if (remainingAfterNextSlot > 0 && remainingAfterNextSlot < MinimumSlotCapacityMinutes &&
+                nextSlotStart < latestStart)
+            {
+                // Skip this orphaned slot - move to window end aligned position
+                currentSlotStart = windowEnd.AddMinutes(-packageBaseDuration);
+                if (currentSlotStart <= latestStart && currentSlotStart > nextSlotStart)
+                {
+                    continue;
+                }
+            }
+
+            currentSlotStart = nextSlotStart;
+        }
+
+        return slots;
+    }
+
     public async Task<CreateBookingResponseDto> CreateBookingAsync(
-        CreateBookingDto dto,
-        CancellationToken cancellationToken = default)
+       CreateBookingDto dto,
+       CancellationToken cancellationToken = default)
     {
         var polandTimeZone = GetPolandTimeZone();
         var nowInPoland = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandTimeZone);
@@ -171,14 +249,14 @@ public class BookingService : IBookingService
             dto.Email,
             dto.Phone);
 
-        var totalBlockedDurationMinutes = dto.Package.GetBaseDurationMinutes() + TurnaroundBufferMinutes;
+        var totalBlockedDurationMinutes = dto.Package.GetBaseDurationMinutes();
 
         // Ensure StartTime is converted to UTC to satisfy Npgsql
         var booking = new Booking(
             customerInfo,
             dto.ParticipantsCount,
             dto.Package,
-            dto.StartTime.ToUniversalTime(), 
+            dto.StartTime.ToUniversalTime(),
             totalBlockedDurationMinutes);
 
         await _repository.AddAsync(booking, cancellationToken);
@@ -202,7 +280,7 @@ public class BookingService : IBookingService
 
         if (booking.PaymentStatus == PaymentStatus.Paid)
         {
-            _logger.LogInformation("Booking {Id} was already processed as paid.", booking.Id);
+            _logger.LogInformation("Booking {Id} was already process as paid.", booking.Id);
             return;
         }
 

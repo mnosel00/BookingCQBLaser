@@ -21,6 +21,18 @@ export interface PackageDetails {
 const NAME_PATTERN = /^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]+$/;
 const PHONE_PATTERN = /^\d{9}$/;
 
+// Mapping of PackageType to actual game duration in minutes (excluding prep time)
+const PACKAGE_BLOCK_MINUTES: Record<PackageType, number> = {
+  [PackageType.S1]: 90,
+  [PackageType.S2]: 90,
+  [PackageType.Premium]: 120,
+  [PackageType.Max]: 120,
+  [PackageType.U1]: 90,
+  [PackageType.U2]: 120,
+  [PackageType.U3]: 120,
+  [PackageType.Combat]: 120
+};
+
 @Component({
   selector: 'app-booking-wizard',
   standalone: true,
@@ -35,7 +47,8 @@ export class BookingWizard {
   currentStep = 1;
   selectedPackage: PackageType | null = null;
   selectedDate: string | Date = '';
-  availableSlots: TimeSlot[] = [];
+  availableSlotsCompatible: TimeSlot[] = [];
+  availableSlotsIncompatible: TimeSlot[] = [];
   selectedSlot: TimeSlot | null = null;
   selectedCategory: 'regular' | 'birthday' = 'regular';
 
@@ -185,6 +198,15 @@ export class BookingWizard {
     return this.customerForm.get(name);
   }
 
+  getIncompatibleSlotDisplay(slot: TimeSlot): string {
+    return this.getIncompatibleSlotMessage(slot);
+  }
+
+  getActualEndTime(): string | null {
+    if (!this.selectedSlot) return null;
+    return this.selectedSlot.endTime; 
+  }
+
   setCategory(cat: 'regular' | 'birthday'): void {
     this.selectedCategory = cat;
   }
@@ -193,6 +215,35 @@ export class BookingWizard {
     if (this.currentStep > 1) {
       this.currentStep--;
     }
+  }
+
+ private isSlotCompatible(slot: TimeSlot): boolean {
+    if (this.selectedPackage === null) return true;
+    const requiredDuration = PACKAGE_BLOCK_MINUTES[this.selectedPackage];
+    // Zmieniono na maxAvailableDurationMinutes
+    return slot.maxAvailableDurationMinutes >= requiredDuration;
+  }
+
+  private getIncompatibleSlotMessage(slot: TimeSlot): string {
+    if (this.selectedPackage === null) return '';
+    
+    // Szukamy pakietów, które zmieszczą się w tym okienku
+    const compatiblePackages = Object.entries(PACKAGE_BLOCK_MINUTES)
+      .filter(([_, duration]) => duration <= slot.maxAvailableDurationMinutes)
+      .map(([pkg]) => {
+        const pkgType = Number(pkg) as PackageType;
+        return this.packagesList.find(p => p.type === pkgType)?.name || '';
+      })
+      .filter(name => name.length > 0)
+      .join(', ');
+    
+    return `Ten termin pozwala tylko na rezerwację ${slot.maxAvailableDurationMinutes} min. Zmień pakiet na ${compatiblePackages}, aby go wybrać.`;
+  }
+
+  private calculateActualEndTime(startTime: Date, durationMinutes: number): Date {
+    const endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + durationMinutes);
+    return endTime;
   }
 
   openTerms(): void {
@@ -208,7 +259,8 @@ export class BookingWizard {
   selectPackage(pkg: PackageType): void {
     this.selectedPackage = pkg;
     this.selectedDate = '';
-    this.availableSlots = [];
+    this.availableSlotsCompatible = [];
+    this.availableSlotsIncompatible = [];
     this.selectedSlot = null;
     this.successMessage = '';
     this.showPhoneContactWarning = false;
@@ -256,7 +308,8 @@ export class BookingWizard {
 
   onDateChange(date: string): void {
     this.selectedDate = date;
-    this.availableSlots = [];
+    this.availableSlotsCompatible = [];
+    this.availableSlotsIncompatible = [];
     this.selectedSlot = null;
     this.showPhoneContactWarning = false;
 
@@ -269,12 +322,20 @@ export class BookingWizard {
 
     this.isLoadingSlots = true;
     this.bookingApiService.getAvailableSlots(date, this.selectedPackage).subscribe({
-      next: (slots) => { this.availableSlots = slots; this.isLoadingSlots = false; },
+      next: (slots) => { 
+        this.availableSlotsCompatible = slots.filter(s => this.isSlotCompatible(s));
+        this.availableSlotsIncompatible = slots.filter(s => !this.isSlotCompatible(s));
+        this.isLoadingSlots = false; 
+      },
       error: () => { this.isLoadingSlots = false; window.alert('Could not load available time slots.'); }
     });
   }
 
   selectSlot(slot: TimeSlot): void {
+    if (!this.isSlotCompatible(slot)) {
+      window.alert(this.getIncompatibleSlotMessage(slot));
+      return;
+    }
     this.selectedSlot = slot;
     this.currentStep = 3;
   }

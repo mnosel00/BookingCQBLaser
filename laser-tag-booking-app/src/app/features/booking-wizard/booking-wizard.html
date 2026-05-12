@@ -95,17 +95,38 @@
       <p *ngIf="isLoadingSlots" class="loading-text">Ładowanie slotów...</p>
 
       <ng-container *ngIf="!isLoadingSlots">
-        <ul *ngIf="availableSlots.length > 0; else noSlots">
-          <li *ngFor="let slot of availableSlots">
+        <!-- Compatible slots -->
+        <ul *ngIf="availableSlotsCompatible.length > 0">
+          <li *ngFor="let slot of availableSlotsCompatible">
             <button type="button" (click)="selectSlot(slot)">
               {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
             </button>
           </li>
         </ul>
 
+        <!-- Incompatible slots (too short) -->
+        <div *ngIf="availableSlotsIncompatible.length > 0" class="incompatible-slots-section">
+          <p class="incompatible-slots-title">Dostępne terminy wymagające zmiany pakietu:</p>
+          <ul class="incompatible-slots-list">
+            <li *ngFor="let slot of availableSlotsIncompatible" class="incompatible-slot-item">
+              <button type="button" class="slot-btn--incompatible" (click)="selectSlot(slot)" disabled>
+                {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
+              </button>
+              <span class="slot-hint" [title]="getIncompatibleSlotDisplay(slot)">
+                ⚠️ {{ slot.maxAvailableDurationMinutes }} min
+              </span>
+              <span class="slot-tooltip">{{ getIncompatibleSlotDisplay(slot) }}</span>
+            </li>
+          </ul>
+        </div>
+
         <ng-template #noSlots>
           <p class="empty-state" *ngIf="selectedDate">Brak dostępnych slotów dla wybranej daty.</p>
         </ng-template>
+
+        <ng-container *ngIf="availableSlotsCompatible.length === 0 && availableSlotsIncompatible.length === 0">
+          <ng-container *ngTemplateOutlet="noSlots"></ng-container>
+        </ng-container>
       </ng-container>
     </ng-container>
   </section>
@@ -121,7 +142,7 @@
       <span class="summary-label">Wybrany pakiet:</span>
       <span class="summary-value">{{ selectedPackageDetails.name }} - {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
       <span class="summary-slot" *ngIf="selectedSlot">
-        📅 {{ selectedDate | date:'dd.MM.yyyy' }} 🕐 {{ selectedSlot.startTime | date:'HH:mm' }} – {{ selectedSlot.endTime | date:'HH:mm' }}
+        📅 {{ selectedDate | date:'dd.MM.yyyy' }} 🕐 {{ selectedSlot.startTime | date:'HH:mm' }} – {{ (getActualEndTime() || selectedSlot.endTime) | date:'HH:mm' }}
       </span>
     </div>
 
