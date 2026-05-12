@@ -237,7 +237,7 @@ export class BookingWizard {
       .filter(name => name.length > 0)
       .join(', ');
     
-    return `Ten termin pozwala tylko na rezerwację ${slot.maxAvailableDurationMinutes} min. Zmień pakiet na ${compatiblePackages}, aby go wybrać.`;
+    return `Ten termin jest nie dostępny dla wybranego pakietu. Zmień pakiet na ${compatiblePackages}, aby go wybrać.`;
   }
 
   private calculateActualEndTime(startTime: Date, durationMinutes: number): Date {

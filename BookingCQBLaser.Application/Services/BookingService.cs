@@ -168,52 +168,46 @@ public class BookingService : IBookingService
     }
 
     private List<TimeSlotDto> GenerateSlotsForWindow(
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
-        int packageBaseDuration,
-        int clientGameDuration)
+    DateTimeOffset windowStart,
+    DateTimeOffset windowEnd,
+    int packageBaseDuration,
+    int clientGameDuration)
     {
         var slots = new List<TimeSlotDto>();
         int windowDurationMinutes = (int)(windowEnd - windowStart).TotalMinutes;
 
-        // Skip windows too small for minimum package (90 minutes)
-        if (windowDurationMinutes < MinimumSlotCapacityMinutes)
+        if (windowDurationMinutes < MinimumSlotCapacityMinutes) // 90 min
         {
             return slots;
         }
 
         var currentSlotStart = windowStart;
-        var latestStart = windowEnd.AddMinutes(-packageBaseDuration);
 
-        while (currentSlotStart <= latestStart)
+        // KLUCZOWA ZMIANA: Szukamy slotów tak, jakby każdy mógł być 90-minutowy (MinimumSlotCapacityMinutes)
+        // Dzięki temu znajdziemy okno 14:00-15:30 nawet jeśli klient szuka pakietu 120 min.
+        var latestStartFoundByMinimum = windowEnd.AddMinutes(-MinimumSlotCapacityMinutes);
+
+        while (currentSlotStart <= latestStartFoundByMinimum)
         {
-            var slotEnd = currentSlotStart.AddMinutes(packageBaseDuration);
-            var displaySlotEnd = currentSlotStart.AddMinutes(clientGameDuration);
+            // Wyliczamy ile faktycznie miejsca jest w tym oknie od tego momentu
             int maxAvailableDuration = (int)(windowEnd - currentSlotStart).TotalMinutes;
 
-            // Capacity verification: mark if window can only accommodate short packages (90 min)
-            // The CanAccommodateLongPackages property handles this in the DTO
+            // Dla potrzeb zasady anty-fragmentacyjnej sprawdzamy "najkrótszy możliwy" blok
+            // Jeśli 90 minut wchodzi idealnie (gap == 0) lub zostawia >= 90 min, to slot jest fizycznie dostępny.
+            int gapBefore = (int)(currentSlotStart - windowStart).TotalMinutes;
 
-            slots.Add(new TimeSlotDto(currentSlotStart, displaySlotEnd, maxAvailableDuration));
+            // Sprawdzamy czy start w tym miejscu (co 30 min) nie psuje Tetrisa
+            bool isGapBeforeValid = gapBefore == 0 || gapBefore >= MinimumSlotCapacityMinutes;
 
-            var nextSlotStart = currentSlotStart.AddMinutes(SlotIntervalMinutes);
-
-            // Slot pushing optimization: avoid creating unsaleable 30-minute gaps
-            // If the next slot would leave less than MinimumSlotCapacityMinutes after the current slot,
-            // and current slot is not at window boundary, skip to next interval
-            int remainingAfterNextSlot = (int)(windowEnd - nextSlotStart).TotalMinutes;
-            if (remainingAfterNextSlot > 0 && remainingAfterNextSlot < MinimumSlotCapacityMinutes &&
-                nextSlotStart < latestStart)
+            if (isGapBeforeValid)
             {
-                // Skip this orphaned slot - move to window end aligned position
-                currentSlotStart = windowEnd.AddMinutes(-packageBaseDuration);
-                if (currentSlotStart <= latestStart && currentSlotStart > nextSlotStart)
-                {
-                    continue;
-                }
+                // Obliczamy koniec gry dla wyświetlania (według wybranego pakietu)
+                var displaySlotEnd = currentSlotStart.AddMinutes(clientGameDuration);
+
+                slots.Add(new TimeSlotDto(currentSlotStart, displaySlotEnd, maxAvailableDuration));
             }
 
-            currentSlotStart = nextSlotStart;
+            currentSlotStart = currentSlotStart.AddMinutes(SlotIntervalMinutes);
         }
 
         return slots;
@@ -375,20 +369,5 @@ public class BookingService : IBookingService
         }
 
         return merged;
-    }
-
-    private static bool OverlapsWithBusyPeriods(
-        DateTimeOffset slotStart,
-        DateTimeOffset slotEnd,
-        List<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods)
-    {
-        foreach (var (busyStart, busyEnd) in busyPeriods)
-        {
-            if (slotStart < busyEnd && slotEnd > busyStart)
-            {
-                return true;
-            }
-        }
-        return false;
     }
 }

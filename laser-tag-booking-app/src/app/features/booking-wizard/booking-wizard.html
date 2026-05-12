@@ -112,9 +112,6 @@
               <button type="button" class="slot-btn--incompatible" (click)="selectSlot(slot)" disabled>
                 {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
               </button>
-              <span class="slot-hint" [title]="getIncompatibleSlotDisplay(slot)">
-                ⚠️ {{ slot.maxAvailableDurationMinutes }} min
-              </span>
               <span class="slot-tooltip">{{ getIncompatibleSlotDisplay(slot) }}</span>
             </li>
           </ul>
