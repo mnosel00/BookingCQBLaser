@@ -183,25 +183,22 @@ public class BookingService : IBookingService
 
         var currentSlotStart = windowStart;
 
-        // KLUCZOWA ZMIANA: Szukamy slotów tak, jakby każdy mógł być 90-minutowy (MinimumSlotCapacityMinutes)
-        // Dzięki temu znajdziemy okno 14:00-15:30 nawet jeśli klient szuka pakietu 120 min.
+        
         var latestStartFoundByMinimum = windowEnd.AddMinutes(-MinimumSlotCapacityMinutes);
 
         while (currentSlotStart <= latestStartFoundByMinimum)
         {
-            // Wyliczamy ile faktycznie miejsca jest w tym oknie od tego momentu
             int maxAvailableDuration = (int)(windowEnd - currentSlotStart).TotalMinutes;
 
-            // Dla potrzeb zasady anty-fragmentacyjnej sprawdzamy "najkrótszy możliwy" blok
-            // Jeśli 90 minut wchodzi idealnie (gap == 0) lub zostawia >= 90 min, to slot jest fizycznie dostępny.
+            
             int gapBefore = (int)(currentSlotStart - windowStart).TotalMinutes;
 
-            // Sprawdzamy czy start w tym miejscu (co 30 min) nie psuje Tetrisa
+           
             bool isGapBeforeValid = gapBefore == 0 || gapBefore >= MinimumSlotCapacityMinutes;
 
             if (isGapBeforeValid)
             {
-                // Obliczamy koniec gry dla wyświetlania (według wybranego pakietu)
+                
                 var displaySlotEnd = currentSlotStart.AddMinutes(clientGameDuration);
 
                 slots.Add(new TimeSlotDto(currentSlotStart, displaySlotEnd, maxAvailableDuration));
