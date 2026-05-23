@@ -44,9 +44,12 @@ builder.Services.AddScoped<IBookingService, BookingService>();
 // Configure CORS for Angular development
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AngularApp", policy =>
+    options.AddPolicy("ProductionCorsPolicy", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                "https://comboarena.netlify.app",
+                "https://comboarena.pl",
+                "https://www.comboarena.pl")
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
@@ -67,7 +70,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseCors("AngularApp");
+app.UseCors("ProductionCorsPolicy");
 
 app.UseAuthorization();
 
