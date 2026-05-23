@@ -8,20 +8,12 @@ import { TimeSlot, CreateBookingRequest, PackageType } from '../models/booking.m
 })
 export class BookingApiService {
   private readonly httpClient = inject(HttpClient);
-  //private readonly apiUrl = 'https://localhost:7083/api/bookings';
-  private readonly apiUrl = 'https://nontumultuous-rosamaria-discernably.ngrok-free.dev/api/bookings';
-
-  // getAvailableSlots(date: string, packageType: PackageType): Observable<TimeSlot[]> {
-  //   const url = `${this.apiUrl}/available-slots?date=${encodeURIComponent(date)}&package=${packageType}`;
-  //   return this.httpClient.get<TimeSlot[]>(url);
-  // }
+  private readonly apiUrl = 'https://api.comboarena.pl/api/bookings';
 
   getAvailableSlots(date: string, packageType: PackageType): Observable<TimeSlot[]> {
-  const headers = new HttpHeaders().set('ngrok-skip-browser-warning', 'true');
-  const url = `${this.apiUrl}/available-slots?date=${encodeURIComponent(date)}&package=${packageType}`;
-  
-  return this.httpClient.get<TimeSlot[]>(url, { headers });
-}
+    const url = `${this.apiUrl}/available-slots?date=${encodeURIComponent(date)}&package=${packageType}`;
+    return this.httpClient.get<TimeSlot[]>(url);
+  }
 
   createBooking(request: CreateBookingRequest): Observable<{ bookingId: string }> {
     return this.httpClient.post<{ bookingId: string }>(this.apiUrl, request);
