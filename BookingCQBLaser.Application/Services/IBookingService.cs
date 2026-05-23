@@ -13,5 +13,6 @@ namespace BookingCQBLaser.Application.Services
         Task<IEnumerable<TimeSlotDto>> GetAvailableTimeSlotsAsync(DateTimeOffset date, PackageType package, CancellationToken cancellationToken = default);
         Task<CreateBookingResponseDto> CreateBookingAsync(CreateBookingDto dto, CancellationToken cancellationToken = default);
         Task ConfirmBookingPaymentAsync(Guid bookingId, CancellationToken cancellationToken = default);
+        Task ProcessPaymentWebhookAsync(Guid bookingId, string status, CancellationToken cancellationToken = default);
     }
 }

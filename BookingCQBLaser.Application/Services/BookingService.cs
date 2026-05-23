@@ -316,6 +316,89 @@ public class BookingService : IBookingService
         }
     }
 
+ 
+    public async Task ProcessPaymentWebhookAsync(Guid bookingId, string status, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Processing HotPay webhook for booking {BookingId} with status: {Status}",
+            bookingId, status);
+
+        // ===== STEP 1: FETCH BOOKING =====
+        var booking = await _repository.GetByIdAsync(bookingId, cancellationToken);
+        
+        if (booking == null)
+        {
+            _logger.LogError("Booking not found for webhook processing: {BookingId}", bookingId);
+            throw new KeyNotFoundException($"Booking with ID {bookingId} not found.");
+        }
+
+        // ===== STEP 2: HANDLE SUCCESS STATUS =====
+        if (status == "SUCCESS")
+        {
+            // IDEMPOTENCY: If already paid, skip processing
+            if (booking.PaymentStatus == PaymentStatus.Paid)
+            {
+                _logger.LogInformation(
+                    "Received duplicate SUCCESS webhook for already-paid booking {BookingId}. " +
+                    "Idempotent: skipping re-processing.",
+                    bookingId);
+                return;
+            }
+
+            // Delegate to existing payment confirmation flow
+            await ConfirmBookingPaymentAsync(bookingId, cancellationToken);
+        }
+
+        // ===== STEP 3: HANDLE FAILURE/PENDING STATUS =====
+        else if (status == "FAILURE" || status == "PENDING")
+        {
+            // IDEMPOTENCY: If already in terminal state, skip processing
+            if (booking.PaymentStatus == PaymentStatus.Failed || booking.PaymentStatus == PaymentStatus.Paid)
+            {
+                _logger.LogInformation(
+                    "Received {Status} webhook for booking {BookingId} already in {CurrentStatus} state. " +
+                    "Idempotent: no state change needed.",
+                    status,
+                    bookingId,
+                    booking.PaymentStatus);
+                return;
+            }
+
+            try
+            {
+                // Use domain method - maintains encapsulation and DDD principles
+                booking.MarkAsFailed();
+                await _repository.UpdateAsync(booking, cancellationToken);
+                
+                _logger.LogInformation(
+                    "Booking {BookingId} marked as Failed due to HotPay status: {Status}.",
+                    bookingId,
+                    status);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // This can occur if booking is already in a terminal state
+                _logger.LogWarning(
+                    ex,
+                    "Cannot mark booking {BookingId} as failed (current PaymentStatus: {CurrentStatus}): {Error}",
+                    bookingId,
+                    booking.PaymentStatus,
+                    ex.Message);
+                throw;
+            }
+        }
+
+        // ===== STEP 4: UNKNOWN STATUS =====
+        else
+        {
+            _logger.LogWarning(
+                "Received unknown HotPay status '{Status}' for booking {BookingId}. Ignoring.",
+                status,
+                bookingId);
+            // Don't throw - unknown statuses are logged but don't cause errors
+        }
+    }
+
     private async Task<List<(DateTimeOffset Start, DateTimeOffset End)>> GetCombinedBusyPeriodsAsync(
         DateTimeOffset dayStart,
         DateTimeOffset dayEnd,

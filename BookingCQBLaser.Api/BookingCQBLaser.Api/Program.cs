@@ -1,3 +1,4 @@
+using BookingCQBLaser.Api.Filters;
 using BookingCQBLaser.Application.Services;
 using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Interfaces;
@@ -29,6 +30,8 @@ builder.Services.Configure<HotPayOptions>(builder.Configuration.GetSection("HotP
 // Register repositories
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 
+
+
 // Register external services
 builder.Services.AddScoped<IGoogleCalendarService, GoogleCalendarService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -36,6 +39,7 @@ builder.Services.AddScoped<IHotPayService, HotPayService>();
 
 //Background Services
 builder.Services.AddHostedService<ExpiredBookingCleanupService>();
+builder.Services.AddScoped<HotPayIpWhitelistFilter>();
 
 
 // Register application services
