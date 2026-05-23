@@ -62,5 +62,13 @@ namespace BookingCQBLaser.Domain.Entities
         {
             PaymentStatus = PaymentStatus.Paid;
         }
+        public void MarkAsFailed()
+        {
+            if (PaymentStatus != PaymentStatus.Pending)
+            {
+                throw new InvalidOperationException($"Cannot mark booking as failed when PaymentStatus is {PaymentStatus}. Only Pending bookings can be marked as failed.");
+            }
+            PaymentStatus = PaymentStatus.Failed;
+        }
     }
 }

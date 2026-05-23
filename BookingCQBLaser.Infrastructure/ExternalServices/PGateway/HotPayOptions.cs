@@ -10,7 +10,9 @@ namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
     {
         public string Secret { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
+        public string Secure { get; set; } = string.Empty;
         public string NotificationUrl { get; set; } = string.Empty;
         public string SuccessUrl { get; set; } = string.Empty;
+        public string TrustedWebhookIpAddresses { get; set; } = string.Empty;
     }
 }

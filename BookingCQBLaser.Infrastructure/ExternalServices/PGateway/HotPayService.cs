@@ -19,27 +19,55 @@ namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
 
         public string GeneratePaymentUrl(Booking booking, int amount)
         {
-            return $"https://platnosc.hotpay.pl/?SEKRET={_options.Secret}&KWOTA={amount}&NAZWA_USLUGI=Rezerwacja&ADRES_PRZEKIEROWANIA={_options.SuccessUrl}&ID_ZAMOWIENIA={booking.Id}&EMAIL={booking.Customer.Email}";
+            if (booking == null)
+                throw new ArgumentNullException(nameof(booking));
+
+            if (amount <= 0)
+                throw new ArgumentException("Amount must be greater than zero.", nameof(amount));
+
+            // Compute hash according to HotPay documentation
+            var hashInput = $"{_options.Password};{amount};Rezerwacja;{_options.SuccessUrl};{booking.Id};{_options.Secret}";
+            var hash = ComputeSha256(hashInput);
+
+            // Build payment URL with all required parameters including mandatory HASH
+            var paymentUrl = $"https://platnosc.hotpay.pl/?" +
+                $"SEKRET={Uri.EscapeDataString(_options.Secret)}" +
+                $"&KWOTA={amount}" +
+                $"&NAZWA_USLUGI=Rezerwacja" +
+                $"&ADRES_WWW={Uri.EscapeDataString(_options.SuccessUrl)}" +
+                $"&ID_ZAMOWIENIA={booking.Id}" +
+                $"&EMAIL={Uri.EscapeDataString(booking.Customer.Email)}" +
+                $"&HASH={hash}";
+
+            return paymentUrl;
         }
 
         public bool ValidateNotification(IFormCollection formData)
         {
+            // Extract all required fields from webhook
             var hash = formData["HASH"].ToString();
             var status = formData["STATUS"].ToString();
             var kwota = formData["KWOTA"].ToString();
             var idZamowienia = formData["ID_ZAMOWIENIA"].ToString();
             var idPlatnosci = formData["ID_PLATNOSCI"].ToString();
             var sekret = formData["SEKRET"].ToString();
+            var secure = formData["SECURE"].ToString();
 
+            // Validate required fields are present
             if (string.IsNullOrEmpty(status) || string.IsNullOrEmpty(hash))
                 return false;
 
-            
+            // CRITICAL SECURITY CHECK: Verify incoming SEKRET matches our configured secret BEFORE computing hash
+            if (!string.Equals(sekret, _options.Secret, StringComparison.Ordinal))
+            {
+                return false;
+            }
 
-            // Password + ";" + KWOTA + ";" + ID_PLATNOSCI + ";" + ID_ZAMOWIENIA + ";" + STATUS + ";" + SEKRET
-            var rawString = $"{_options.Password};{kwota};{idPlatnosci};{idZamowienia};{status};{sekret}";
+            // Compute hash according to HotPay documentation formula
+            var rawString = $"{_options.Password};{kwota};{idPlatnosci};{idZamowienia};{status};{secure};{sekret}";
             var computedHash = ComputeSha256(rawString);
 
+            // Compare hashes (case-insensitive as per HotPay specs)
             return string.Equals(hash, computedHash, StringComparison.OrdinalIgnoreCase);
         }
 
