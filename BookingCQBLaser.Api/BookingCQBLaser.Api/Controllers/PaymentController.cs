@@ -1,5 +1,4 @@
-﻿using BookingCQBLaser.Api.Filters;
-using BookingCQBLaser.Application.Services;
+﻿using BookingCQBLaser.Application.Services;
 using BookingCQBLaser.Domain.Enums;
 using BookingCQBLaser.Domain.Interfaces;
 using BookingCQBLaser.Infrastructure.ExternalServices.PGateway;
