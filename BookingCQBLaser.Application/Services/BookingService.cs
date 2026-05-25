@@ -17,8 +17,8 @@ public class BookingService : IBookingService
 {
     private const int SlotIntervalMinutes = 30;
     private const int MinimumSlotCapacityMinutes = 90;
-    private const int LongPackageMinimumMinutes = 120;
-    private static readonly TimeOnly ArenaOpenTime = new(8, 0);
+
+    private static readonly TimeOnly ArenaOpenTime = new(9, 0);
     private static readonly TimeOnly ArenaCloseTime = new(23, 0);
 
     private readonly IBookingRepository _repository;
@@ -93,15 +93,20 @@ public class BookingService : IBookingService
         var packageBaseDuration = package.GetBaseDurationMinutes();
         var clientGameDuration = package.GetClientGameDurationMinutes();
 
+        var dateOnlyInPoland = requestedDateInPoland.Date;
+        var polandOffset = polandTimeZone.GetUtcOffset(dateOnlyInPoland);
+
+        // Create day boundaries with Poland offset
         var dayStart = new DateTimeOffset(
-            date.Year, date.Month, date.Day,
+            dateOnlyInPoland.Year, dateOnlyInPoland.Month, dateOnlyInPoland.Day,
             ArenaOpenTime.Hour, ArenaOpenTime.Minute, 0,
-            date.Offset);
+            polandOffset);
 
         var dayEnd = new DateTimeOffset(
-            date.Year, date.Month, date.Day,
+            dateOnlyInPoland.Year, dateOnlyInPoland.Month, dateOnlyInPoland.Day,
             ArenaCloseTime.Hour, ArenaCloseTime.Minute, 0,
-            date.Offset);
+            polandOffset);
+
 
         // Convert boundaries to UTC for DB and Google Calendar queries
         var busyPeriods = await GetCombinedBusyPeriodsAsync(
