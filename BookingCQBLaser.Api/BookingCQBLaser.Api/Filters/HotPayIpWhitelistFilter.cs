@@ -18,7 +18,8 @@ namespace BookingCQBLaser.Api.Filters
 
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
-            var remoteIp = context.HttpContext.Connection.RemoteIpAddress?.ToString();
+            var remoteIp = ExtractRemoteIpAddress(context.HttpContext);
+
 
             if (!ValidateRemoteIpAddress(remoteIp))
             {
@@ -26,7 +27,7 @@ namespace BookingCQBLaser.Api.Filters
                     "HotPayIpWhitelistFilter: Webhook request REJECTED from untrusted IP '{RemoteIp}'. " +
                     "Returning HTTP 403 Forbidden.",
                     remoteIp ?? "UNKNOWN");
-                context.Result = new ForbidResult();
+                context.Result = new StatusCodeResult(StatusCodes.Status403Forbidden);
                 return;
             }
 
@@ -34,7 +35,25 @@ namespace BookingCQBLaser.Api.Filters
             await next();
         }
 
-      
+        private string? ExtractRemoteIpAddress(HttpContext httpContext)
+        {
+            var forwardedHeader = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(forwardedHeader))
+            {
+                var clientIp = forwardedHeader.Split(',')[0].Trim();
+                _logger.LogDebug("IP extracted from X-Forwarded-For header: {ClientIp}", clientIp);
+                return clientIp;
+            }
+
+            var directIp = httpContext.Connection.RemoteIpAddress?.ToString();
+            if (!string.IsNullOrEmpty(directIp))
+            {
+                _logger.LogDebug("IP extracted from RemoteIpAddress (direct connection): {DirectIp}", directIp);
+            }
+            return directIp;
+        }
+
+
         private bool ValidateRemoteIpAddress(string? remoteIp)
         {
             if (string.IsNullOrEmpty(remoteIp))
