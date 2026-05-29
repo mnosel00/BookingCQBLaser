@@ -19,6 +19,9 @@ namespace BookingCQBLaser.Domain.Entities
         public string? GoogleCalendarEventId { get; private set; }
         public DateTimeOffset CreatedAt { get; private set; }
         public PaymentStatus PaymentStatus { get; private set; } = PaymentStatus.Pending;
+        public bool IsAdultGroup { get; private set; }
+        public string? AgeRange { get; private set; }
+
 
 
         // Constructor for ORM usage
@@ -29,12 +32,25 @@ namespace BookingCQBLaser.Domain.Entities
             int participantsCount,
             PackageType package,
             DateTimeOffset startTime,
-            int totalBlockedDurationMinutes)
+            int totalBlockedDurationMinutes,
+            bool isAdultGroup,
+            string? ageRange)
         {
             Id = Guid.NewGuid();
             CreatedAt = DateTimeOffset.UtcNow;
 
             Customer = customer ?? throw new ArgumentNullException(nameof(customer));
+
+            if (!isAdultGroup && string.IsNullOrWhiteSpace(ageRange))
+            {
+                throw new ArgumentException(
+                    "AgeRange is required when IsAdultGroup is false. Please provide an age range for non-adult groups.",
+                    nameof(ageRange));
+            }
+
+            IsAdultGroup = isAdultGroup;
+            AgeRange = isAdultGroup ? null : ageRange?.Trim();
+
             SetBookingDetails(participantsCount, package, startTime, totalBlockedDurationMinutes);
         }
 

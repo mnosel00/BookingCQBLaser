@@ -14,5 +14,7 @@ namespace BookingCQBLaser.Application.DTOs
     string Phone,
     int ParticipantsCount,
     PackageType Package,
-    DateTimeOffset StartTime);
+    DateTimeOffset StartTime,
+    bool IsAdultGroup,
+    string? AgeRange);
 }

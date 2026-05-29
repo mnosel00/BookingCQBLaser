@@ -45,6 +45,16 @@ namespace BookingCQBLaser.Infrastructure.Persistence.Configurations
 
             builder.Property(b => b.Package)
                 .HasConversion<string>();
+
+            builder.Property(b => b.IsAdultGroup)
+                .IsRequired()
+                .HasDefaultValue(false)
+                .HasColumnName("IsAdultGroup");
+
+            builder.Property(b => b.AgeRange)
+                .IsRequired(false)
+                .HasMaxLength(50)
+                .HasColumnName("AgeRange");
         }
     }
 }

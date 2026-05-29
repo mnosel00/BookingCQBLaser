@@ -253,10 +253,16 @@ public class BookingService : IBookingService
             dto.ParticipantsCount,
             dto.Package,
             dto.StartTime.ToUniversalTime(),
-            totalBlockedDurationMinutes);
+            totalBlockedDurationMinutes,
+            dto.IsAdultGroup,
+            dto.AgeRange);
 
         await _repository.AddAsync(booking, cancellationToken);
-        _logger.LogInformation("Booking {BookingId} saved to database as Pending", booking.Id);
+        _logger.LogInformation(
+            "Booking {BookingId} saved to database as Pending. IsAdultGroup={IsAdultGroup}, AgeRange={AgeRange}",
+            booking.Id,
+            booking.IsAdultGroup,
+            booking.AgeRange); 
 
         int depositAmountP = 304;
         string paymentUrl = _hotpayService.GeneratePaymentUrl(booking, depositAmountP);
