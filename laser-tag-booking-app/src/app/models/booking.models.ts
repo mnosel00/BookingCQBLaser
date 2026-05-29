@@ -23,6 +23,8 @@ export interface CreateBookingRequest {
   participantsCount: number;
   package: PackageType;
   startTime: string;
+  isAdultGroup: boolean; 
+  ageRange: string | null;
 }
 
 export interface CreateBookingResponse {

@@ -137,11 +137,28 @@ export class BookingWizard {
     phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN)]],
     participantsCount: [1, [Validators.required, Validators.min(8), Validators.max(26)]],
     acceptTerms: [false, Validators.requiredTrue],
-    acceptLegal: [false, Validators.requiredTrue]
+    acceptLegal: [false, Validators.requiredTrue],
+    isAdultGroup: [false], 
+    ageRange: ['', Validators.required]
   });
 
   constructor() {
     this.customerForm.get('acceptTerms')?.disable();
+
+    this.customerForm.get('isAdultGroup')?.valueChanges.subscribe((isAdult: boolean) => {
+    const ageRangeControl = this.customerForm.get('ageRange');
+    if (!ageRangeControl) return;
+
+    if (isAdult) {
+      ageRangeControl.setValue('');
+      ageRangeControl.disable();
+      ageRangeControl.clearValidators();
+    } else {
+      ageRangeControl.enable();
+      ageRangeControl.setValidators([Validators.required]);
+    }
+    ageRangeControl.updateValueAndValidity();
+    });
   }
 
   get filteredPackages(): PackageDetails[] {
@@ -355,7 +372,9 @@ export class BookingWizard {
       phone: fv.phone.trim(),
       participantsCount: Number(fv.participantsCount),
       package: this.selectedPackage,
-      startTime: this.selectedSlot.startTime
+      startTime: this.selectedSlot.startTime,
+      isAdultGroup: fv.isAdultGroup, 
+      ageRange: fv.isAdultGroup ? null : fv.ageRange.trim()
     };
 
     this.isSubmitting = true;

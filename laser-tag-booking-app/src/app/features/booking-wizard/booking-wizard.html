@@ -173,6 +173,26 @@
         <small class="error-text" *ngIf="f('phone')?.touched && f('phone')?.hasError('pattern')">Proszę podać poprawny numer 123456789</small>
       </div>
 
+      <div class="checkbox-group" style="margin-bottom: 1.25rem;">
+      <label class="checkbox-item" for="isAdultGroup">
+        <input id="isAdultGroup" type="checkbox" formControlName="isAdultGroup" />
+        <span><strong>Grupa wyłącznie pełnoletnia (+18)</strong></span>
+      </label>
+    </div>
+
+    <div class="form-field" [style.opacity]="f('isAdultGroup')?.value ? '0.5' : '1'">
+      <label for="ageRange">Przedział wiekowy uczestników (np. 11-14)</label>
+      <input 
+        id="ageRange" 
+        type="text" 
+        formControlName="ageRange" 
+        placeholder="Podaj wiek, np. 12-15" 
+      />
+      <small class="error-text" *ngIf="f('ageRange')?.enabled && f('ageRange')?.touched && f('ageRange')?.hasError('required')">
+        Przedział wiekowy jest wymagany dla grup niepełnoletnich.
+      </small>
+    </div>
+
       <div class="form-field">
         <label for="participantsCount">Liczba uczestników</label>
         <input id="participantsCount" type="number" min="1" formControlName="participantsCount" />
