@@ -19,7 +19,6 @@ public class BookingService : IBookingService
     private const int MinimumSlotCapacityMinutes = 90;
 
     private static readonly TimeOnly ArenaOpenTime = new(9, 0);
-    private static readonly TimeOnly ArenaCloseTime = new(23, 0);
 
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
@@ -73,6 +72,12 @@ public class BookingService : IBookingService
         return targetDate.Date >= nowInPoland.Date.AddDays(3);
     }
 
+    private TimeOnly GetArenaCloseTime(DayOfWeek dayOfWeek)
+    {
+        return dayOfWeek == DayOfWeek.Sunday
+            ? new TimeOnly(16, 0)  
+            : new TimeOnly(23, 0); 
+    }
 
     public async Task<IEnumerable<TimeSlotDto>> GetAvailableTimeSlotsAsync(
          DateTimeOffset date,
@@ -96,6 +101,8 @@ public class BookingService : IBookingService
         var dateOnlyInPoland = requestedDateInPoland.Date;
         var polandOffset = polandTimeZone.GetUtcOffset(dateOnlyInPoland);
 
+        var arenaCloseTime = GetArenaCloseTime(requestedDateInPoland.DayOfWeek);
+
         // Create day boundaries with Poland offset
         var dayStart = new DateTimeOffset(
             dateOnlyInPoland.Year, dateOnlyInPoland.Month, dateOnlyInPoland.Day,
@@ -104,7 +111,7 @@ public class BookingService : IBookingService
 
         var dayEnd = new DateTimeOffset(
             dateOnlyInPoland.Year, dateOnlyInPoland.Month, dateOnlyInPoland.Day,
-            ArenaCloseTime.Hour, ArenaCloseTime.Minute, 0,
+            arenaCloseTime.Hour, arenaCloseTime.Minute, 0,
             polandOffset);
 
 

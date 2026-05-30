@@ -19,9 +19,8 @@
     {{ successMessage }}
   </p>
 
-  <!-- STEP 1 -->
   <section *ngIf="currentStep === 1" aria-labelledby="step-1-title">
-    <h2 id="step-1-title">Wybierz pakiet</h2>
+    <h2 id="step-1-title" style="margin-bottom: 1rem;">Wybierz pakiet</h2>
 
     <div class="category-toggle" role="tablist" aria-label="Package category">
       <button type="button" role="tab" class="category-toggle__btn"
@@ -66,7 +65,6 @@
     </div>
   </section>
 
-  <!-- STEP 2 -->
   <section *ngIf="currentStep === 2" aria-labelledby="step-2-title">
     <div class="step-nav">
       <button type="button" class="btn-back" (click)="previousStep()">Wróć</button>
@@ -78,14 +76,16 @@
       <span class="summary-value">{{ selectedPackageDetails.name }} - {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
     </div>
 
-    <label for="bookingDate">Data</label>
-    <input
-      id="bookingDate"
-      type="date"
-      [min]="minDateValue"
-      [value]="selectedDateValue"
-      (change)="onDateChange(($any($event.target)).value)"
-    />
+    <div class="form-field">
+      <label for="bookingDate">Data</label>
+      <input
+        id="bookingDate"
+        type="date"
+        [min]="minDateValue"
+        [value]="selectedDateValue"
+        (change)="onDateChange(($any($event.target)).value)"
+      />
+    </div>
 
     <div *ngIf="showPhoneContactWarning" class="error-text error-text--important" style="margin-top: 1rem;">
       Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199
@@ -95,8 +95,7 @@
       <p *ngIf="isLoadingSlots" class="loading-text">Ładowanie slotów...</p>
 
       <ng-container *ngIf="!isLoadingSlots">
-        <!-- Compatible slots -->
-        <ul *ngIf="availableSlotsCompatible.length > 0">
+        <ul class="slots-list-grid" *ngIf="availableSlotsCompatible.length > 0">
           <li *ngFor="let slot of availableSlotsCompatible">
             <button type="button" (click)="selectSlot(slot)">
               {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
@@ -104,10 +103,9 @@
           </li>
         </ul>
 
-        <!-- Incompatible slots (too short) -->
         <div *ngIf="availableSlotsIncompatible.length > 0" class="incompatible-slots-section">
           <p class="incompatible-slots-title">Dostępne terminy wymagające zmiany pakietu:</p>
-          <ul class="incompatible-slots-list">
+          <ul class="slots-list-grid" style="margin-top: 0;">
             <li *ngFor="let slot of availableSlotsIncompatible" class="incompatible-slot-item">
               <button type="button" class="slot-btn--incompatible" (click)="selectSlot(slot)" disabled>
                 {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
@@ -128,7 +126,6 @@
     </ng-container>
   </section>
 
-  <!-- STEP 3 -->
   <section *ngIf="currentStep === 3" aria-labelledby="step-3-title">
     <div class="step-nav">
       <button type="button" class="btn-back" (click)="previousStep()">Wróć</button>
@@ -174,24 +171,24 @@
       </div>
 
       <div class="checkbox-group" style="margin-bottom: 1.25rem;">
-      <label class="checkbox-item" for="isAdultGroup">
-        <input id="isAdultGroup" type="checkbox" formControlName="isAdultGroup" />
-        <span><strong>Grupa wyłącznie pełnoletnia (+18)</strong></span>
-      </label>
-    </div>
+        <label class="checkbox-item" for="isAdultGroup">
+          <input id="isAdultGroup" type="checkbox" formControlName="isAdultGroup" />
+          <span><strong>Grupa wyłącznie pełnoletnia (+18)</strong></span>
+        </label>
+      </div>
 
-    <div class="form-field" [style.opacity]="f('isAdultGroup')?.value ? '0.5' : '1'">
-      <label for="ageRange">Przedział wiekowy uczestników (np. 11-14)</label>
-      <input 
-        id="ageRange" 
-        type="text" 
-        formControlName="ageRange" 
-        placeholder="Podaj wiek, np. 12-15" 
-      />
-      <small class="error-text" *ngIf="f('ageRange')?.enabled && f('ageRange')?.touched && f('ageRange')?.hasError('required')">
-        Przedział wiekowy jest wymagany dla grup niepełnoletnich.
-      </small>
-    </div>
+      <div class="form-field" [style.opacity]="f('isAdultGroup')?.value ? '0.5' : '1'" style="transition: opacity 0.2s ease;">
+        <label for="ageRange">Przedział wiekowy uczestników (np. 11-14)</label>
+        <input 
+          id="ageRange" 
+          type="text" 
+          formControlName="ageRange" 
+          placeholder="Podaj wiek, np. 12-15" 
+        />
+        <small class="error-text" *ngIf="f('ageRange')?.enabled && f('ageRange')?.touched && f('ageRange')?.hasError('required')">
+          Przedział wiekowy jest wymagany dla grup niepełnoletnich.
+        </small>
+      </div>
 
       <div class="form-field">
         <label for="participantsCount">Liczba uczestników</label>
@@ -205,7 +202,6 @@
         </small>
       </div>
 
-      <!-- CHANGED: financial summary (receipt style, no duplicate section) -->
       <div class="booking-cost-summary">
         <div class="booking-cost-summary__row">
           <span>Suma za pakiet:</span>
@@ -277,7 +273,7 @@
 </main>
 
 @if (showTermsModal) {
-  <div class="modal-overlay" (click)="closeTerms()">
+  <div class="modal-overlay" (click)='closeTerms()'>
     <div class="modal-content" (click)="$event.stopPropagation()">
       <div class="terms-container">
         <h3>Ogólne zasady uczestnictwa i rezerwacji</h3>
@@ -287,12 +283,13 @@
             <ul>
               <li><strong>10 osób:</strong> dla pakietów S1 oraz U1.</li>
               <li><strong>8 osób:</strong> dla pozostałych pakietów (S2, U2, Premium, U3, MAX, Combat).</li>
-              <li>W przypdaku <strong>mniejszych grup płatność</strong> będzie naliczana za <strong>minimalną ilość osób</strong> z uwzględnieniem wybranego pakietu </li>
+              <li>W przypadku <strong>mniejszych grup płatność</strong> będzie naliczana za <strong>minimalną ilość osób</strong> z uwzględnieniem wybranego pakietu </li>
             </ul>
           </li>          
-          <li><strong>Zadatek:</strong> W celu doknania rezerwacji wymagana jest wpłata zadatku w wysokości 300 PLN.</li>
+          <li><strong>Zadatek:</strong> W celu dokonania rezerwacji wymagana jest wpłata zadatku w wysokości 300 PLN.</li>
           <li><strong>Płatność:</strong> Pozostała część kwoty do dopłaty na miejscu jest przyjmowana <strong>TYLKO GOTÓWKĄ</strong>, z uwzględnieniem zadeklarowanej przy rezerwacji liczby uczestników(-2 osoby).</li>
-          <li><strong>Punktualność:</strong> Prosimy o przybycie <strong>dokładnie na zarezerwowaną godzinę</strong> – nie za wcześnie (ze względu na trwające gry innych grup) i nie za późno. Spóźnienie może skutkować proporcjonalnym skróceniem czasu gry.</li>          <li><strong>Trzeźwość i Bezpieczeństwo:</strong> Osoby pod wpływem alkoholu lub innych substancji odurzających nie będą wpuszczane na teren obiektu. W przypadku stwierdzenia takiego stanu, rezerwacja zostanie anulowana bez możliwości zwrotu zadatku.</li>
+          <li><strong>Punktualność:</strong> Prosimy o przybycie <strong>dokładnie na zarezerwowaną godzinę</strong> – nie za wcześnie (ze względu na trwające gry innych grup) i nie za późno. Spóźnienie może skutkować proporcjonalnym skróceniem czasu gry.</li>          
+          <li><strong>Trzeźwość i Bezpieczeństwo:</strong> Osoby pod wpływem alkoholu lub innych substancji odurzających nie będą wpuszczane na teren obiektu. W przypadku stwierdzenia takiego stanu, rezerwacja zostanie anulowana bez możliwości zwrotu zadatku.</li>
           <li><strong>Osoby niepełnoletnie:</strong> W przypadku uczestnictwa osób niepełnoletnich będących pod opieką opiekuna, prosimy o podpisanie i przyniesienie w dniu imprezy poniższego oświadczenia i zgody:
             <ul>
               <li><a href="https://comboarena.pl/wp-content/uploads/oswiadczenieopiekunagrupy.pdf" target="_blank">Oświadczenie opiekuna grupy (PDF)</a></li>
@@ -301,7 +298,6 @@
               <li><a href="https://comboarena.pl/wp-content/uploads/zgodarodzica.pdf" target="_blank">Zgoda rodzica (PDF)</a></li>
             </ul>
           </li>
-      
         </ul>
       </div>
       <button type="button" class="modal-close-btn" (click)="closeTerms()">Akceptuję</button>

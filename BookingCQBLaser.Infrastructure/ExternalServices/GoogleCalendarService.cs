@@ -66,12 +66,15 @@ public class GoogleCalendarService : IGoogleCalendarService
     {
         var service = CreateCalendarService();
 
+        var ageGroupInfo = booking.IsAdultGroup ? "+18 (Dorośli)" : booking.AgeRange;
+
         var calendarEvent = new Event
         {
             Summary = $"[{booking.Package}] {booking.Customer.FirstName} {booking.Customer.LastName}",
             Description = $"Package: {booking.Package}\n" +
                           $"Participants: {booking.ParticipantsCount}\n" +
                           $"Phone: {booking.Customer.Phone}\n" +
+                          $"Age Group: {ageGroupInfo}\n" + 
                           $"Email: {booking.Customer.Email}",
             Start = new EventDateTime
             {
