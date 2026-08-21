@@ -85,6 +85,15 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Apply any pending EF Core migrations on startup, so the schema is never out of sync with
+// what the running code expects (e.g. the overlap-exclusion constraint / indexes migration).
+// Safe to run on every startup: Migrate() is a no-op once the database is already up to date.
+using (var migrationScope = app.Services.CreateScope())
+{
+    var dbContext = migrationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
