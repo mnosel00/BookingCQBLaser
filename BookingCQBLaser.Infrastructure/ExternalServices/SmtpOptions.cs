@@ -1,13 +1,12 @@
-namespace BookingCQBLaser.Infrastructure.ExternalServices
+namespace BookingCQBLaser.Infrastructure.ExternalServices;
+
+public class SmtpOptions
 {
-    public class SmtpOptions
-    {
-        public string Host { get; set; } = string.Empty;
-        public int Port { get; set; }
-        public bool EnableSsl { get; set; }
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public string SenderName { get; set; } = string.Empty;
-        public string SenderEmail { get; set; } = string.Empty;
-    }
+    public string Host { get; set; } = string.Empty;
+    public int Port { get; set; }
+    public bool EnableSsl { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string SenderName { get; set; } = string.Empty;
+    public string SenderEmail { get; set; } = string.Empty;
 }

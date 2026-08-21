@@ -1,4 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import {
   FormBuilder,
@@ -20,18 +21,6 @@ export interface PackageDetails {
 
 const NAME_PATTERN = /^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]+$/;
 const PHONE_PATTERN = /^\d{9}$/;
-
-// Mapping of PackageType to actual game duration in minutes (excluding prep time)
-const PACKAGE_BLOCK_MINUTES: Record<PackageType, number> = {
-  [PackageType.S1]: 90,
-  [PackageType.S2]: 90,
-  [PackageType.Premium]: 120,
-  [PackageType.Max]: 120,
-  [PackageType.U1]: 90,
-  [PackageType.U2]: 120,
-  [PackageType.U3]: 120,
-  [PackageType.Combat]: 120
-};
 
 @Component({
   selector: 'app-booking-wizard',
@@ -58,6 +47,10 @@ export class BookingWizard {
   showTermsModal = false;
   hasOpenedTerms = false;
   showPhoneContactWarning = false;
+
+  // Fetched from GET /api/packages - the backend (PackageTypeExtensions.GetBaseDurationMinutes)
+  // is the single source of truth for blocked duration, not a hardcoded client-side copy.
+  private packageBlockMinutes: Partial<Record<PackageType, number>> = {};
 
   readonly minDateValue: string = new Date().toISOString().slice(0, 10);
 
@@ -159,6 +152,18 @@ export class BookingWizard {
     }
     ageRangeControl.updateValueAndValidity();
     });
+
+    this.bookingApiService.getPackageDurations().subscribe({
+      next: (durations) => {
+        this.packageBlockMinutes = Object.fromEntries(
+          durations.map(d => [d.type, d.blockedDurationMinutes])
+        );
+      },
+      error: () => {
+        // Fail open: isSlotCompatible treats an unknown duration as compatible rather than
+        // blocking every slot if this fetch fails.
+      }
+    });
   }
 
   get filteredPackages(): PackageDetails[] {
@@ -236,17 +241,17 @@ export class BookingWizard {
 
  private isSlotCompatible(slot: TimeSlot): boolean {
     if (this.selectedPackage === null) return true;
-    const requiredDuration = PACKAGE_BLOCK_MINUTES[this.selectedPackage];
-    // Zmieniono na maxAvailableDurationMinutes
+    const requiredDuration = this.packageBlockMinutes[this.selectedPackage];
+    if (requiredDuration === undefined) return true; // durations not loaded yet - fail open
     return slot.maxAvailableDurationMinutes >= requiredDuration;
   }
 
   private getIncompatibleSlotMessage(slot: TimeSlot): string {
     if (this.selectedPackage === null) return '';
-    
+
     // Szukamy pakietów, które zmieszczą się w tym okienku
-    const compatiblePackages = Object.entries(PACKAGE_BLOCK_MINUTES)
-      .filter(([_, duration]) => duration <= slot.maxAvailableDurationMinutes)
+    const compatiblePackages = Object.entries(this.packageBlockMinutes)
+      .filter(([_, duration]) => duration !== undefined && duration <= slot.maxAvailableDurationMinutes)
       .map(([pkg]) => {
         const pkgType = Number(pkg) as PackageType;
         return this.packagesList.find(p => p.type === pkgType)?.name || '';
@@ -385,9 +390,21 @@ export class BookingWizard {
         sessionStorage.setItem('lastBookingId', result.bookingId);
         window.location.href = result.paymentUrl;
       },
-      error: () => { 
-        this.isSubmitting = false; 
-        window.alert('Booking failed. Please try again.'); 
+      error: (err: HttpErrorResponse) => {
+        this.isSubmitting = false;
+
+        if (err.status === 409) {
+          // Someone else booked this slot in the time it took to fill out the form.
+          window.alert('Ten termin został właśnie zarezerwowany przez kogoś innego. Wybierz proszę inny termin.');
+          this.selectedSlot = null;
+          this.currentStep = 2;
+          if (this.selectedDate && this.selectedPackage !== null) {
+            this.onDateChange(this.selectedDateValue);
+          }
+          return;
+        }
+
+        window.alert('Rezerwacja nie powiodła się. Spróbuj ponownie.');
       }
     });
   }

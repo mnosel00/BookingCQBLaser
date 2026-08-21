@@ -7,7 +7,10 @@ using BookingCQBLaser.Infrastructure.ExternalServices.PGateway;
 using BookingCQBLaser.Infrastructure.Persistence.Configurations;
 using BookingCQBLaser.Infrastructure.Persistence.Repositories;
 using Microsoft.AspNetCore.Builder.Extensions;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
+using IPNetwork = Microsoft.AspNetCore.HttpOverrides.IPNetwork;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,9 +35,25 @@ builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 
 
 // Register external services
-builder.Services.AddScoped<IGoogleCalendarService, GoogleCalendarService>();
+// GoogleCalendarService is a singleton: it holds no per-request state, and its Google credential
+// should be resolved once per process rather than mutating GOOGLE_APPLICATION_CREDENTIALS per request.
+builder.Services.AddSingleton<IGoogleCalendarService, GoogleCalendarService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IHotPayService, HotPayService>();
+
+// The API sits behind a reverse proxy on the same Ubuntu host/Docker network, so trust
+// X-Forwarded-For only when it comes from that local/private network - never from the open
+// internet - otherwise HotPayIpWhitelistFilter's IP check is trivially spoofable.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+    options.KnownNetworks.Add(new IPNetwork(IPAddress.Loopback, 8));
+    options.KnownNetworks.Add(new IPNetwork(IPAddress.Parse("10.0.0.0"), 8));
+    options.KnownNetworks.Add(new IPNetwork(IPAddress.Parse("172.16.0.0"), 12));
+    options.KnownNetworks.Add(new IPNetwork(IPAddress.Parse("192.168.0.0"), 16));
+});
 
 //Background Services
 builder.Services.AddHostedService<ExpiredBookingCleanupService>();
@@ -42,6 +61,8 @@ builder.Services.AddScoped<HotPayIpWhitelistFilter>();
 
 
 // Register application services
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IAvailabilityCalculator, AvailabilityCalculator>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
 // Configure CORS for Angular development
@@ -70,6 +91,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Must run before anything that reads the client IP (CORS, auth, the HotPay IP whitelist filter)
+// so RemoteIpAddress is already resolved from the trusted proxy by the time they see it.
+app.UseForwardedHeaders();
 
 app.UseHttpsRedirection();
 

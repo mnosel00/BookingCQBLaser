@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace BookingCQBLaser.Infrastructure.Persistence.Repositories
 {
@@ -39,7 +40,25 @@ namespace BookingCQBLaser.Infrastructure.Persistence.Repositories
         public async Task AddAsync(Booking booking, CancellationToken cancellationToken = default)
         {
             await _dbContext.Bookings.AddAsync(booking, cancellationToken);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (IsOverlapViolation(ex))
+            {
+                // The database's exclusion constraint is the final line of defense against two
+                // concurrent requests both passing the application-level availability check for
+                // the same time range.
+                throw new InvalidOperationException(
+                    "The requested time slot overlaps with an existing booking.", ex);
+            }
+        }
+
+        private static bool IsOverlapViolation(DbUpdateException ex)
+        {
+            return ex.InnerException is PostgresException pg
+                && pg.SqlState == PostgresErrorCodes.ExclusionViolation;
         }
 
         public async Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default)

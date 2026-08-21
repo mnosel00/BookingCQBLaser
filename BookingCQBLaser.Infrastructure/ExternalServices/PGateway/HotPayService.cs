@@ -57,8 +57,9 @@ namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
             if (string.IsNullOrEmpty(status) || string.IsNullOrEmpty(hash))
                 return false;
 
-            // CRITICAL SECURITY CHECK: Verify incoming SEKRET matches our configured secret BEFORE computing hash
-            if (!string.Equals(sekret, _options.Secret, StringComparison.Ordinal))
+            // CRITICAL SECURITY CHECK: Verify incoming SEKRET matches our configured secret BEFORE computing hash.
+            // Constant-time comparison so a network attacker can't use response-timing to guess the secret.
+            if (!FixedTimeEquals(sekret, _options.Secret))
             {
                 return false;
             }
@@ -67,8 +68,21 @@ namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
             var rawString = $"{_options.Password};{kwota};{idPlatnosci};{idZamowienia};{status};{secure};{sekret}";
             var computedHash = ComputeSha256(rawString);
 
-            // Compare hashes (case-insensitive as per HotPay specs)
-            return string.Equals(hash, computedHash, StringComparison.OrdinalIgnoreCase);
+            // Compare hashes (case-insensitive as per HotPay specs), still constant-time
+            return FixedTimeEquals(hash.ToLowerInvariant(), computedHash);
+        }
+
+        private static bool FixedTimeEquals(string a, string b)
+        {
+            var aBytes = Encoding.UTF8.GetBytes(a);
+            var bBytes = Encoding.UTF8.GetBytes(b);
+
+            if (aBytes.Length != bBytes.Length)
+            {
+                return false;
+            }
+
+            return CryptographicOperations.FixedTimeEquals(aBytes, bBytes);
         }
 
         private static string ComputeSha256(string rawData)

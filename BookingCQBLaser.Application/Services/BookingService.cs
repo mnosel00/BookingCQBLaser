@@ -1,4 +1,4 @@
-﻿// ..\BookingCQBLaser.Application\Services\BookingService.cs
+// ..\BookingCQBLaser.Application\Services\BookingService.cs
 using BookingCQBLaser.Application.DTOs;
 using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Enums;
@@ -15,12 +15,14 @@ namespace BookingCQBLaser.Application.Services;
 
 public class BookingService : IBookingService
 {
-    private const int SlotIntervalMinutes = 30;
-    private const int MinimumSlotCapacityMinutes = 90;
-
-    private static readonly TimeOnly ArenaOpenTime = new(9, 0);
+    // See CONTEXT.md: Deposit is flat regardless of package/participants; Service Fee is the
+    // online-payment surcharge that never reduces the on-site Remaining Balance.
+    private const int Deposit = 300;
+    private const int ServiceFee = 4;
+    private const int OnlineChargeAmount = Deposit + ServiceFee;
 
     private readonly IBookingRepository _repository;
+    private readonly IAvailabilityCalculator _availabilityCalculator;
     private readonly IGoogleCalendarService _googleCalendarService;
     private readonly IEmailService _emailService;
     private readonly IHotPayService _hotpayService;
@@ -28,214 +30,36 @@ public class BookingService : IBookingService
 
     public BookingService(
         IBookingRepository repository,
+        IAvailabilityCalculator availabilityCalculator,
         IGoogleCalendarService googleCalendarService,
         IEmailService emailService,
         IHotPayService hotpayService,
         ILogger<BookingService> logger)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _availabilityCalculator = availabilityCalculator ?? throw new ArgumentNullException(nameof(availabilityCalculator));
         _googleCalendarService = googleCalendarService ?? throw new ArgumentNullException(nameof(googleCalendarService));
         _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
         _hotpayService = hotpayService ?? throw new ArgumentNullException(nameof(hotpayService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    private static TimeZoneInfo GetPolandTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            // Fallback for Windows instances without IANA time zone support
-            return TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
-        }
-    }
-
-    private bool IsOnlineBookingAllowed(DateTimeOffset targetDate, DateTimeOffset nowInPoland)
-    {
-        if (targetDate.Date < nowInPoland.Date) return false;
-
-        if (targetDate.DayOfWeek == DayOfWeek.Saturday)
-        {
-            var deadline = targetDate.Date.AddDays(-1).AddHours(22); // Friday 22:00
-            return nowInPoland <= deadline;
-        }
-        if (targetDate.DayOfWeek == DayOfWeek.Sunday)
-        {
-            var deadline = targetDate.Date.AddDays(-1).AddHours(22); // Saturday 22:00
-            return nowInPoland <= deadline;
-        }
-
-        // Monday-Friday (3 calendar days rule)
-        return targetDate.Date >= nowInPoland.Date.AddDays(3);
-    }
-
-    private TimeOnly GetArenaCloseTime(DayOfWeek dayOfWeek)
-    {
-        return dayOfWeek == DayOfWeek.Sunday
-            ? new TimeOnly(16, 0)  
-            : new TimeOnly(23, 0); 
-    }
-
-    public async Task<IEnumerable<TimeSlotDto>> GetAvailableTimeSlotsAsync(
+    public Task<IEnumerable<TimeSlotDto>> GetAvailableTimeSlotsAsync(
          DateTimeOffset date,
          PackageType package,
          CancellationToken cancellationToken = default)
-    {
-        var polandTimeZone = GetPolandTimeZone();
-        var nowInPoland = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandTimeZone);
-
-        var requestedDateInPoland = TimeZoneInfo.ConvertTimeFromUtc(date.UtcDateTime, polandTimeZone);
-
-        if (!IsOnlineBookingAllowed(requestedDateInPoland, nowInPoland))
-        {
-            _logger.LogInformation("Requested date {Date} is not allowed by booking rules. Returning empty slots.", requestedDateInPoland.Date);
-            return new List<TimeSlotDto>();
-        }
-
-        var packageBaseDuration = package.GetBaseDurationMinutes();
-        var clientGameDuration = package.GetClientGameDurationMinutes();
-
-        var dateOnlyInPoland = requestedDateInPoland.Date;
-        var polandOffset = polandTimeZone.GetUtcOffset(dateOnlyInPoland);
-
-        var arenaCloseTime = GetArenaCloseTime(requestedDateInPoland.DayOfWeek);
-
-        // Create day boundaries with Poland offset
-        var dayStart = new DateTimeOffset(
-            dateOnlyInPoland.Year, dateOnlyInPoland.Month, dateOnlyInPoland.Day,
-            ArenaOpenTime.Hour, ArenaOpenTime.Minute, 0,
-            polandOffset);
-
-        var dayEnd = new DateTimeOffset(
-            dateOnlyInPoland.Year, dateOnlyInPoland.Month, dateOnlyInPoland.Day,
-            arenaCloseTime.Hour, arenaCloseTime.Minute, 0,
-            polandOffset);
-
-
-        // Convert boundaries to UTC for DB and Google Calendar queries
-        var busyPeriods = await GetCombinedBusyPeriodsAsync(
-            dayStart.ToUniversalTime(),
-            dayEnd.ToUniversalTime(),
-            cancellationToken);
-
-        // Get free windows between busy periods
-        var freeWindows = GetFreeWindows(dayStart, dayEnd, busyPeriods);
-
-        // Generate slots for each free window
-        var availableSlots = new List<TimeSlotDto>();
-        foreach (var (windowStart, windowEnd) in freeWindows)
-        {
-            var windowSlots = GenerateSlotsForWindow(windowStart, windowEnd, packageBaseDuration, clientGameDuration);
-            availableSlots.AddRange(windowSlots);
-        }
-
-        _logger.LogInformation(
-            "Found {Count} available slots for {Date} with package {Package} across {WindowCount} free windows",
-            availableSlots.Count, date.Date, package, freeWindows.Count);
-
-        return availableSlots;
-    }
-
-    private List<(DateTimeOffset Start, DateTimeOffset End)> GetFreeWindows(
-        DateTimeOffset dayStart,
-        DateTimeOffset dayEnd,
-        List<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods)
-    {
-        var freeWindows = new List<(DateTimeOffset Start, DateTimeOffset End)>();
-
-        if (busyPeriods.Count == 0)
-        {
-            freeWindows.Add((dayStart, dayEnd));
-            return freeWindows;
-        }
-
-        // Window before first busy period
-        if (dayStart < busyPeriods[0].Start)
-        {
-            freeWindows.Add((dayStart, busyPeriods[0].Start));
-        }
-
-        // Windows between consecutive busy periods
-        for (int i = 0; i < busyPeriods.Count - 1; i++)
-        {
-            var windowStart = busyPeriods[i].End;
-            var windowEnd = busyPeriods[i + 1].Start;
-
-            if (windowStart < windowEnd)
-            {
-                freeWindows.Add((windowStart, windowEnd));
-            }
-        }
-
-        // Window after last busy period
-        if (busyPeriods[^1].End < dayEnd)
-        {
-            freeWindows.Add((busyPeriods[^1].End, dayEnd));
-        }
-
-        return freeWindows;
-    }
-
-    private List<TimeSlotDto> GenerateSlotsForWindow(
-    DateTimeOffset windowStart,
-    DateTimeOffset windowEnd,
-    int packageBaseDuration,
-    int clientGameDuration)
-    {
-        var slots = new List<TimeSlotDto>();
-        int windowDurationMinutes = (int)(windowEnd - windowStart).TotalMinutes;
-
-        if (windowDurationMinutes < MinimumSlotCapacityMinutes) // 90 min
-        {
-            return slots;
-        }
-
-        var currentSlotStart = windowStart;
-
-        
-        var latestStartFoundByMinimum = windowEnd.AddMinutes(-MinimumSlotCapacityMinutes);
-
-        while (currentSlotStart <= latestStartFoundByMinimum)
-        {
-            int maxAvailableDuration = (int)(windowEnd - currentSlotStart).TotalMinutes;
-
-            
-            int gapBefore = (int)(currentSlotStart - windowStart).TotalMinutes;
-
-           
-            bool isGapBeforeValid = gapBefore == 0 || gapBefore >= MinimumSlotCapacityMinutes;
-
-            if (isGapBeforeValid)
-            {
-                
-                var displaySlotEnd = currentSlotStart.AddMinutes(clientGameDuration);
-
-                slots.Add(new TimeSlotDto(currentSlotStart, displaySlotEnd, maxAvailableDuration));
-            }
-
-            currentSlotStart = currentSlotStart.AddMinutes(SlotIntervalMinutes);
-        }
-
-        return slots;
-    }
+        => _availabilityCalculator.GetAvailableTimeSlotsAsync(date, package, cancellationToken);
 
     public async Task<CreateBookingResponseDto> CreateBookingAsync(
        CreateBookingDto dto,
        CancellationToken cancellationToken = default)
     {
-        var polandTimeZone = GetPolandTimeZone();
-        var nowInPoland = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandTimeZone);
-        var requestedDateInPoland = TimeZoneInfo.ConvertTimeFromUtc(dto.StartTime.UtcDateTime, polandTimeZone);
-
-        if (!IsOnlineBookingAllowed(requestedDateInPoland, nowInPoland))
+        if (!_availabilityCalculator.IsOnlineBookingAllowed(dto.StartTime))
         {
             throw new InvalidOperationException("Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199");
         }
 
-        var availableSlots = await GetAvailableTimeSlotsAsync(dto.StartTime, dto.Package, cancellationToken);
+        var availableSlots = await _availabilityCalculator.GetAvailableTimeSlotsAsync(dto.StartTime, dto.Package, cancellationToken);
         var isSlotAvailable = availableSlots.Any(slot => slot.StartTime == dto.StartTime);
 
         if (!isSlotAvailable)
@@ -269,10 +93,9 @@ public class BookingService : IBookingService
             "Booking {BookingId} saved to database as Pending. IsAdultGroup={IsAdultGroup}, AgeRange={AgeRange}",
             booking.Id,
             booking.IsAdultGroup,
-            booking.AgeRange); 
+            booking.AgeRange);
 
-        int depositAmountP = 304;
-        string paymentUrl = _hotpayService.GeneratePaymentUrl(booking, depositAmountP);
+        string paymentUrl = _hotpayService.GeneratePaymentUrl(booking, OnlineChargeAmount);
 
         return new CreateBookingResponseDto(booking.Id, paymentUrl);
     }
@@ -286,7 +109,7 @@ public class BookingService : IBookingService
             throw new KeyNotFoundException($"Booking with ID {bookingId} not found.");
         }
 
-        return new BookingStatusDto(booking.Id, booking.PaymentStatus.ToString());
+        return new BookingStatusDto(booking.Id, booking.PaymentStatus);
     }
 
     public async Task ConfirmBookingPaymentAsync(Guid bookingId, CancellationToken cancellationToken = default)
@@ -334,10 +157,9 @@ public class BookingService : IBookingService
         {
             int packagePrice = booking.Package.GetPrice();
             int totalCost = packagePrice * booking.ParticipantsCount;
-            int depositAmount = 300;
-            int remainingBalance = Math.Max(0, totalCost - depositAmount);
+            int remainingBalance = Math.Max(0, totalCost - Deposit);
 
-            await _emailService.SendBookingConfirmationAsync(booking, totalCost, depositAmount, remainingBalance);
+            await _emailService.SendBookingConfirmationAsync(booking, totalCost, Deposit, remainingBalance);
             _logger.LogInformation("Confirmation email sent to {Email} for booking {BookingId}", booking.Customer.Email, booking.Id);
         }
         catch (Exception ex)
@@ -346,16 +168,16 @@ public class BookingService : IBookingService
         }
     }
 
- 
-    public async Task ProcessPaymentWebhookAsync(Guid bookingId, string status, CancellationToken cancellationToken = default)
+
+    public async Task ProcessPaymentWebhookAsync(Guid bookingId, string status, decimal? reportedAmount, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Processing HotPay webhook for booking {BookingId} with status: {Status}",
-            bookingId, status);
+            "Processing HotPay webhook for booking {BookingId} with status: {Status}, reported amount: {ReportedAmount}",
+            bookingId, status, reportedAmount);
 
         // ===== STEP 1: FETCH BOOKING =====
         var booking = await _repository.GetByIdAsync(bookingId, cancellationToken);
-        
+
         if (booking == null)
         {
             _logger.LogError("Booking not found for webhook processing: {BookingId}", bookingId);
@@ -373,6 +195,18 @@ public class BookingService : IBookingService
                     "Idempotent: skipping re-processing.",
                     bookingId);
                 return;
+            }
+
+            // SECURITY: a validly-signed notification only proves it came from HotPay, not that
+            // it paid the right amount. Reject anything that doesn't match what we charged.
+            if (reportedAmount is null || Math.Round(reportedAmount.Value) != OnlineChargeAmount)
+            {
+                _logger.LogError(
+                    "HotPay SUCCESS webhook for booking {BookingId} reported amount {ReportedAmount}, " +
+                    "expected {ExpectedAmount}. Refusing to mark as paid.",
+                    bookingId, reportedAmount, OnlineChargeAmount);
+                throw new InvalidOperationException(
+                    $"Reported payment amount for booking {bookingId} does not match the expected amount.");
             }
 
             // Delegate to existing payment confirmation flow
@@ -399,7 +233,7 @@ public class BookingService : IBookingService
                 // Use domain method - maintains encapsulation and DDD principles
                 booking.MarkAsFailed();
                 await _repository.UpdateAsync(booking, cancellationToken);
-                
+
                 _logger.LogInformation(
                     "Booking {BookingId} marked as Failed due to HotPay status: {Status}.",
                     bookingId,
@@ -427,57 +261,5 @@ public class BookingService : IBookingService
                 bookingId);
             // Don't throw - unknown statuses are logged but don't cause errors
         }
-    }
-
-    private async Task<List<(DateTimeOffset Start, DateTimeOffset End)>> GetCombinedBusyPeriodsAsync(
-        DateTimeOffset dayStart,
-        DateTimeOffset dayEnd,
-        CancellationToken cancellationToken)
-    {
-        var localBookingsTask = _repository.GetByDateRangeAsync(dayStart, dayEnd, cancellationToken);
-        var googleBusyPeriodsTask = _googleCalendarService.GetBusyPeriodsAsync(dayStart, dayEnd, cancellationToken);
-
-        await Task.WhenAll(localBookingsTask, googleBusyPeriodsTask);
-
-        var localBookings = await localBookingsTask;
-        var googleBusyPeriods = await googleBusyPeriodsTask;
-
-        var busyPeriods = new List<(DateTimeOffset Start, DateTimeOffset End)>();
-
-        foreach (var booking in localBookings)
-        {
-            if (string.IsNullOrEmpty(booking.GoogleCalendarEventId))
-            {
-                busyPeriods.Add((booking.StartTime, booking.EndTime));
-            }
-        }
-
-        busyPeriods.AddRange(googleBusyPeriods);
-        return MergeBusyPeriods(busyPeriods);
-    }
-
-    private static List<(DateTimeOffset Start, DateTimeOffset End)> MergeBusyPeriods(
-        List<(DateTimeOffset Start, DateTimeOffset End)> periods)
-    {
-        if (periods.Count == 0) return periods;
-
-        var sorted = periods.OrderBy(p => p.Start).ToList();
-        var merged = new List<(DateTimeOffset Start, DateTimeOffset End)> { sorted[0] };
-
-        foreach (var current in sorted.Skip(1))
-        {
-            var last = merged[^1];
-
-            if (current.Start <= last.End)
-            {
-                merged[^1] = (last.Start, current.End > last.End ? current.End : last.End);
-            }
-            else
-            {
-                merged.Add(current);
-            }
-        }
-
-        return merged;
     }
 }

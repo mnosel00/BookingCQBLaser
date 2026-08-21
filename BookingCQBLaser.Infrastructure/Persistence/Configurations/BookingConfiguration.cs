@@ -55,6 +55,14 @@ namespace BookingCQBLaser.Infrastructure.Persistence.Configurations
                 .IsRequired(false)
                 .HasMaxLength(50)
                 .HasColumnName("AgeRange");
+
+            // GetByDateRangeAsync filters on StartTime + PaymentStatus for every availability
+            // check; the cleanup job filters on PaymentStatus + CreatedAt every 5 minutes.
+            builder.HasIndex(b => new { b.StartTime, b.PaymentStatus })
+                .HasDatabaseName("IX_Bookings_StartTime_PaymentStatus");
+
+            builder.HasIndex(b => new { b.PaymentStatus, b.CreatedAt })
+                .HasDatabaseName("IX_Bookings_PaymentStatus_CreatedAt");
         }
     }
 }
