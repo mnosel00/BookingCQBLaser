@@ -8,33 +8,41 @@ using Microsoft.Extensions.Options;
 
 namespace BookingCQBLaser.Infrastructure.ExternalServices;
 
+// Registered as a singleton: it holds no per-request state, and resolving the Google credential
+// is expensive enough that it should happen once per process, not once per request.
 public class GoogleCalendarService : IGoogleCalendarService
 {
     private readonly GoogleCalendarOptions _options;
     private readonly string[] _scopes = { CalendarService.Scope.Calendar };
     private readonly string _applicationName = "BookingCQBLaser";
+    private readonly Lazy<GoogleCredential> _credential;
 
     public GoogleCalendarService(IOptions<GoogleCalendarOptions> options)
     {
         _options = options.Value;
+        _credential = new Lazy<GoogleCredential>(CreateCredential);
+    }
+
+    private GoogleCredential CreateCredential()
+    {
+        Environment.SetEnvironmentVariable(
+            "GOOGLE_APPLICATION_CREDENTIALS",
+            Path.GetFullPath(_options.ServiceAccountJson));
+        return GoogleCredential.GetApplicationDefault().CreateScoped(_scopes);
     }
 
     private CalendarService CreateCalendarService()
     {
-        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", _options.ServiceAccountJson);
-        var credential = GoogleCredential.GetApplicationDefault()
-            .CreateScoped(_scopes);
-
         return new CalendarService(new BaseClientService.Initializer()
         {
-            HttpClientInitializer = credential,
+            HttpClientInitializer = _credential.Value,
             ApplicationName = _applicationName,
         });
     }
 
     public async Task<IEnumerable<(DateTimeOffset Start, DateTimeOffset End)>> GetBusyPeriodsAsync(DateTimeOffset startDate, DateTimeOffset endDate, CancellationToken cancellationToken = default)
     {
-        var service = CreateCalendarService();
+        using var service = CreateCalendarService();
 
         var request = new FreeBusyRequest
         {
@@ -64,7 +72,7 @@ public class GoogleCalendarService : IGoogleCalendarService
 
     public async Task<string> CreateEventAsync(Booking booking, CancellationToken cancellationToken = default)
     {
-        var service = CreateCalendarService();
+        using var service = CreateCalendarService();
 
         var ageGroupInfo = booking.IsAdultGroup ? "+18 (Dorośli)" : booking.AgeRange;
 

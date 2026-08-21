@@ -35,9 +35,22 @@ public class BookingsController : ControllerBase
         [FromBody] CreateBookingDto dto,
         CancellationToken cancellationToken)
     {
-        var result = await _bookingService.CreateBookingAsync(dto, cancellationToken);
-        // Correctly return the DTO object containing BookingId and PaymentUrl
-        return Ok(result);
+        try
+        {
+            var result = await _bookingService.CreateBookingAsync(dto, cancellationToken);
+            // Correctly return the DTO object containing BookingId and PaymentUrl
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Slot no longer available - either the pre-check found it taken, or a concurrent
+            // request won the race and the database's overlap constraint rejected this one.
+            return Conflict(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpGet("{id}/status")]

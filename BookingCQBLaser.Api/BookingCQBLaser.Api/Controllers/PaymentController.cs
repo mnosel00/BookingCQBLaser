@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,6 +56,11 @@ namespace BookingCQBLaser.Api.Controllers
             // ===== STEP 2: PARSE PAYMENT PARAMETERS =====
             var idZamowienia = notificationData.GetValueOrDefault("ID_ZAMOWIENIA", string.Empty);
             var status = notificationData.GetValueOrDefault("STATUS", string.Empty);
+            var kwotaRaw = notificationData.GetValueOrDefault("KWOTA", string.Empty);
+            decimal? reportedAmount = decimal.TryParse(
+                kwotaRaw, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedAmount)
+                ? parsedAmount
+                : null;
 
             if (!Guid.TryParse(idZamowienia, out var bookingId))
             {
@@ -66,7 +72,7 @@ namespace BookingCQBLaser.Api.Controllers
             // All business logic, state management, and persistence is handled here
             try
             {
-                await _bookingService.ProcessPaymentWebhookAsync(bookingId, status, cancellationToken);
+                await _bookingService.ProcessPaymentWebhookAsync(bookingId, status, reportedAmount, cancellationToken);
                 _logger.LogInformation("HotPay webhook processed successfully for booking {BookingId}.", bookingId);
                 return Ok();
             }

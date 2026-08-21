@@ -14,6 +14,6 @@ namespace BookingCQBLaser.Application.Services
         Task<CreateBookingResponseDto> CreateBookingAsync(CreateBookingDto dto, CancellationToken cancellationToken = default);
         Task<BookingStatusDto> GetBookingStatusAsync(Guid bookingId, CancellationToken cancellationToken = default);
         Task ConfirmBookingPaymentAsync(Guid bookingId, CancellationToken cancellationToken = default);
-        Task ProcessPaymentWebhookAsync(Guid bookingId, string status, CancellationToken cancellationToken = default);
+        Task ProcessPaymentWebhookAsync(Guid bookingId, string status, decimal? reportedAmount, CancellationToken cancellationToken = default);
     }
 }

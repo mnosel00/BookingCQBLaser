@@ -59,9 +59,22 @@ namespace BookingCQBLaser.Domain.Entities
             Customer = customer ?? throw new ArgumentNullException(nameof(customer));
         }
 
+        private const int MaxParticipants = 26;
+        private const int DefaultMinParticipants = 8;
+        private const int HigherMinParticipants = 10;
+
         public void SetBookingDetails(int participantsCount, PackageType package, DateTimeOffset startTime, int totalBlockedDurationMinutes)
         {
-            if (participantsCount <= 0) throw new ArgumentException("Participants count must be greater than zero.", nameof(participantsCount));
+            var minParticipants = (package == PackageType.S1 || package == PackageType.U1)
+                ? HigherMinParticipants
+                : DefaultMinParticipants;
+
+            if (participantsCount < minParticipants || participantsCount > MaxParticipants)
+            {
+                throw new ArgumentException(
+                    $"Participants count for package {package} must be between {minParticipants} and {MaxParticipants}.",
+                    nameof(participantsCount));
+            }
 
             ParticipantsCount = participantsCount;
             Package = package;

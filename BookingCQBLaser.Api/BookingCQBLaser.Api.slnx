@@ -2,5 +2,6 @@
   <Project Path="../BookingCQBLaser.Application/BookingCQBLaser.Application.csproj" Id="cd2910ac-d7d2-4acf-b227-f12f0ca57d0e" />
   <Project Path="../BookingCQBLaser.Domain/BookingCQBLaser.Domain.csproj" />
   <Project Path="../BookingCQBLaser.Infrastructure/BookingCQBLaser.Infrastructure.csproj" />
+  <Project Path="../BookingCQBLaser.Tests/BookingCQBLaser.Tests.csproj" />
   <Project Path="BookingCQBLaser.Api/BookingCQBLaser.Api.csproj" />
 </Solution>

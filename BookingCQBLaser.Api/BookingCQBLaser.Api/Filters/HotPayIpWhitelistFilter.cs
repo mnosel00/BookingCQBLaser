@@ -37,20 +37,12 @@ namespace BookingCQBLaser.Api.Filters
 
         private string? ExtractRemoteIpAddress(HttpContext httpContext)
         {
-            var forwardedHeader = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(forwardedHeader))
-            {
-                var clientIp = forwardedHeader.Split(',')[0].Trim();
-                _logger.LogDebug("IP extracted from X-Forwarded-For header: {ClientIp}", clientIp);
-                return clientIp;
-            }
-
-            var directIp = httpContext.Connection.RemoteIpAddress?.ToString();
-            if (!string.IsNullOrEmpty(directIp))
-            {
-                _logger.LogDebug("IP extracted from RemoteIpAddress (direct connection): {DirectIp}", directIp);
-            }
-            return directIp;
+            // UseForwardedHeaders (configured in Program.cs) already resolves RemoteIpAddress from
+            // X-Forwarded-For when - and only when - the request arrived via the trusted local
+            // reverse proxy. Reading the header directly here would let any caller spoof it.
+            var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString();
+            _logger.LogDebug("IP extracted from RemoteIpAddress: {RemoteIp}", remoteIp);
+            return remoteIp;
         }
 
 
