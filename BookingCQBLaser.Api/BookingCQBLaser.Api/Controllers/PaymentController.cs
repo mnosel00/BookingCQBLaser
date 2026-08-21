@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,8 +39,12 @@ namespace BookingCQBLaser.Api.Controllers
         {
             _logger.LogInformation("Received HotPay webhook notification.");
 
+            // Translate the ASP.NET-specific form payload into a plain dictionary at the API boundary,
+            // so the Domain-level IHotPayService contract stays framework-agnostic.
+            var notificationData = formData.Keys.ToDictionary(key => key, key => formData[key].ToString());
+
             // ===== STEP 1: VALIDATE WEBHOOK SIGNATURE =====
-            if (!_hotPayService.ValidateNotification(formData))
+            if (!_hotPayService.ValidateNotification(notificationData))
             {
                 _logger.LogWarning("HotPay webhook REJECTED: Invalid signature hash or SEKRET mismatch.");
                 return BadRequest("Invalid notification signature.");
@@ -48,8 +53,8 @@ namespace BookingCQBLaser.Api.Controllers
             _logger.LogDebug("Signature validation passed.");
 
             // ===== STEP 2: PARSE PAYMENT PARAMETERS =====
-            var idZamowienia = formData["ID_ZAMOWIENIA"].ToString();
-            var status = formData["STATUS"].ToString();
+            var idZamowienia = notificationData.GetValueOrDefault("ID_ZAMOWIENIA", string.Empty);
+            var status = notificationData.GetValueOrDefault("STATUS", string.Empty);
 
             if (!Guid.TryParse(idZamowienia, out var bookingId))
             {

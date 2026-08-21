@@ -277,6 +277,18 @@ public class BookingService : IBookingService
         return new CreateBookingResponseDto(booking.Id, paymentUrl);
     }
 
+    public async Task<BookingStatusDto> GetBookingStatusAsync(Guid bookingId, CancellationToken cancellationToken = default)
+    {
+        var booking = await _repository.GetByIdAsync(bookingId, cancellationToken);
+
+        if (booking == null)
+        {
+            throw new KeyNotFoundException($"Booking with ID {bookingId} not found.");
+        }
+
+        return new BookingStatusDto(booking.Id, booking.PaymentStatus.ToString());
+    }
+
     public async Task ConfirmBookingPaymentAsync(Guid bookingId, CancellationToken cancellationToken = default)
     {
         var booking = await _repository.GetByIdAsync(bookingId, cancellationToken);

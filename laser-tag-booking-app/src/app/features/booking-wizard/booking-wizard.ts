@@ -380,8 +380,9 @@ export class BookingWizard {
     this.isSubmitting = true;
 
     this.bookingApiService.createBooking(request).subscribe({
-      next: (result: any) => {
+      next: (result) => {
         this.isSubmitting = false;
+        sessionStorage.setItem('lastBookingId', result.bookingId);
         window.location.href = result.paymentUrl;
       },
       error: () => { 

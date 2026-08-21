@@ -31,3 +31,8 @@ export interface CreateBookingResponse {
   bookingId: string;
   paymentUrl: string;
 }
+
+export interface BookingStatus {
+  bookingId: string;
+  paymentStatus: 'Pending' | 'Paid' | 'Failed';
+}
