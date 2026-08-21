@@ -1,4 +1,4 @@
-﻿using BookingCQBLaser.Domain.Entities;
+using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Interfaces;
 using MailKit.Net.Smtp;
 using MailKit.Security;
@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using MimeKit;
 using MimeKit.Text;
 
-namespace BookingCQBLaser.Domain.Interfaces
+namespace BookingCQBLaser.Infrastructure.ExternalServices
 {
     public class EmailService : IEmailService
     {
@@ -19,7 +19,7 @@ namespace BookingCQBLaser.Domain.Interfaces
 
         public async Task SendBookingConfirmationAsync(Booking booking, int totalCost, int depositAmount, int remainingBalance)
         {
-            
+
             if (string.IsNullOrWhiteSpace(_smtpOptions.SenderEmail))
                 throw new InvalidOperationException("SmtpOptions: SenderEmail is missing or null.");
 
@@ -46,7 +46,7 @@ namespace BookingCQBLaser.Domain.Interfaces
                             <li><strong>Zapłacono:</strong> {paidAmount} PLN</li>
                             <li><strong>Do zapłaty na miejscu:</strong> {remainingBalance} PLN (TYLKO GOTÓWKĄ)</li>
                         </ul>
-                        
+
                         <h3>Lokalizacja i Kontakt</h3>
                         <p>
                             <strong>Adres:</strong> Prokocimska 8, wjazd od strony Dworca w Płaszowie.<br/>

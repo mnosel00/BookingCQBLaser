@@ -1,5 +1,11 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { BookingApiService } from '../../services/booking-api';
+
+type SuccessViewState = 'checking' | 'paid' | 'pending' | 'failed' | 'unknown';
+
+const STATUS_POLL_INTERVAL_MS = 2000;
+const STATUS_POLL_MAX_ATTEMPTS = 5;
 
 @Component({
   selector: 'app-booking-success',
@@ -8,8 +14,28 @@ import { RouterModule } from '@angular/router';
   template: `
     <div class="success-container">
       <div class="success-card">
-        <h1>Dziękujemy za rezerwację!</h1>
-        <p>Gdy tylko otrzymamy płatność, wyślemy na Twój adres e-mail potwierdzenie rezerwacji wraz z szczegółami.</p>
+        @switch (state) {
+          @case ('checking') {
+            <h1>Sprawdzamy Twoją płatność…</h1>
+            <p>To zajmie tylko chwilę.</p>
+          }
+          @case ('paid') {
+            <h1>Dziękujemy za rezerwację!</h1>
+            <p>Płatność została potwierdzona. Wysłaliśmy na Twój adres e-mail potwierdzenie rezerwacji wraz ze szczegółami.</p>
+          }
+          @case ('pending') {
+            <h1>Otrzymaliśmy Twoje zgłoszenie</h1>
+            <p>Wciąż czekamy na potwierdzenie płatności od operatora. Gdy tylko je otrzymamy, wyślemy potwierdzenie rezerwacji na Twój adres e-mail.</p>
+          }
+          @case ('failed') {
+            <h1>Płatność się nie powiodła</h1>
+            <p>Niestety nie udało się potwierdzić płatności, a rezerwacja nie została utrzymana. Prosimy spróbować ponownie lub skontaktować się z nami: 509 595 199.</p>
+          }
+          @case ('unknown') {
+            <h1>Dziękujemy!</h1>
+            <p>Gdy tylko otrzymamy płatność, wyślemy na Twój adres e-mail potwierdzenie rezerwacji wraz z szczegółami.</p>
+          }
+        }
         <a routerLink="/" class="home-btn">Wróć na stronę główną</a>
       </div>
     </div>
@@ -62,4 +88,47 @@ import { RouterModule } from '@angular/router';
     }
   `]
 })
-export class BookingSuccessComponent {}
+export class BookingSuccessComponent implements OnInit {
+  private readonly bookingApiService = inject(BookingApiService);
+
+  state: SuccessViewState = 'checking';
+
+  ngOnInit(): void {
+    const bookingId = sessionStorage.getItem('lastBookingId');
+
+    if (!bookingId) {
+      this.state = 'unknown';
+      return;
+    }
+
+    this.pollStatus(bookingId, 1);
+  }
+
+  private pollStatus(bookingId: string, attempt: number): void {
+    this.bookingApiService.getBookingStatus(bookingId).subscribe({
+      next: (result) => {
+        if (result.paymentStatus === 'Paid') {
+          this.state = 'paid';
+          sessionStorage.removeItem('lastBookingId');
+          return;
+        }
+
+        if (result.paymentStatus === 'Failed') {
+          this.state = 'failed';
+          sessionStorage.removeItem('lastBookingId');
+          return;
+        }
+
+        // Still Pending: the HotPay webhook may not have arrived yet, retry briefly.
+        if (attempt < STATUS_POLL_MAX_ATTEMPTS) {
+          setTimeout(() => this.pollStatus(bookingId, attempt + 1), STATUS_POLL_INTERVAL_MS);
+        } else {
+          this.state = 'pending';
+        }
+      },
+      error: () => {
+        this.state = 'unknown';
+      }
+    });
+  }
+}

@@ -1,6 +1,5 @@
 using BookingCQBLaser.Api.Filters;
 using BookingCQBLaser.Application.Services;
-using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Interfaces;
 using BookingCQBLaser.Infrastructure.BackgroundJobs;
 using BookingCQBLaser.Infrastructure.ExternalServices;

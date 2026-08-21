@@ -1,8 +1,8 @@
 ﻿using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Interfaces;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -42,16 +42,16 @@ namespace BookingCQBLaser.Infrastructure.ExternalServices.PGateway
             return paymentUrl;
         }
 
-        public bool ValidateNotification(IFormCollection formData)
+        public bool ValidateNotification(IReadOnlyDictionary<string, string> formData)
         {
             // Extract all required fields from webhook
-            var hash = formData["HASH"].ToString();
-            var status = formData["STATUS"].ToString();
-            var kwota = formData["KWOTA"].ToString();
-            var idZamowienia = formData["ID_ZAMOWIENIA"].ToString();
-            var idPlatnosci = formData["ID_PLATNOSCI"].ToString();
-            var sekret = formData["SEKRET"].ToString();
-            var secure = formData["SECURE"].ToString();
+            var hash = formData.GetValueOrDefault("HASH", string.Empty);
+            var status = formData.GetValueOrDefault("STATUS", string.Empty);
+            var kwota = formData.GetValueOrDefault("KWOTA", string.Empty);
+            var idZamowienia = formData.GetValueOrDefault("ID_ZAMOWIENIA", string.Empty);
+            var idPlatnosci = formData.GetValueOrDefault("ID_PLATNOSCI", string.Empty);
+            var sekret = formData.GetValueOrDefault("SEKRET", string.Empty);
+            var secure = formData.GetValueOrDefault("SECURE", string.Empty);
 
             // Validate required fields are present
             if (string.IsNullOrEmpty(status) || string.IsNullOrEmpty(hash))

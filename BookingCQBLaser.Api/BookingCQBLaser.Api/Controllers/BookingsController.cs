@@ -3,6 +3,7 @@ using BookingCQBLaser.Application.Services;
 using BookingCQBLaser.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -37,5 +38,19 @@ public class BookingsController : ControllerBase
         var result = await _bookingService.CreateBookingAsync(dto, cancellationToken);
         // Correctly return the DTO object containing BookingId and PaymentUrl
         return Ok(result);
+    }
+
+    [HttpGet("{id}/status")]
+    public async Task<IActionResult> GetBookingStatus(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var status = await _bookingService.GetBookingStatusAsync(id, cancellationToken);
+            return Ok(status);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
     }
 }
