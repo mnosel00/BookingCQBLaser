@@ -146,7 +146,7 @@ describe('BookingWizard', () => {
   });
 
   describe('when the slot was taken by someone else (409)', () => {
-    it('clears the stale selection, returns to step 2, and reloads slots', () => {
+    it('clears the stale selection, returns to step 2, reloads slots, and shows an inline error', () => {
       const component = createComponent();
       component.hasOpenedTerms = true;
       component.selectedPackage = PackageType.S1;
@@ -157,18 +157,37 @@ describe('BookingWizard', () => {
 
       apiSpy.createBooking.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 409 })));
       apiSpy.getAvailableSlots.mockReturnValue(of([]));
-      vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       component.submitBooking();
 
       expect(component.selectedSlot).toBeNull();
       expect(component.currentStep).toBe(2);
       expect(apiSpy.getAvailableSlots).toHaveBeenCalled();
+      expect(component.submitErrorMessage).toContain('zarezerwowany przez kogoś innego');
+    });
+
+    it('clears the 409 error message once the user picks a new slot', () => {
+      const component = createComponent();
+      component.hasOpenedTerms = true;
+      component.selectedPackage = PackageType.S1;
+      component.selectedDate = futureWeekday();
+      component.selectedSlot = slot('2026-09-01T09:00:00+02:00', 90);
+      component.currentStep = 3;
+      component.customerForm.setValue(VALID_FORM_VALUE);
+
+      apiSpy.createBooking.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 409 })));
+      apiSpy.getAvailableSlots.mockReturnValue(of([]));
+      component.submitBooking();
+      expect(component.submitErrorMessage).not.toBeNull();
+
+      component.selectSlot(slot('2026-09-01T14:00:00+02:00', 90));
+
+      expect(component.submitErrorMessage).toBeNull();
     });
   });
 
   describe('on a generic booking failure', () => {
-    it('shows an alert but does not reset the wizard state', () => {
+    it('shows an inline error message but does not reset the wizard state', () => {
       const component = createComponent();
       component.hasOpenedTerms = true;
       component.selectedPackage = PackageType.S1;
@@ -178,11 +197,10 @@ describe('BookingWizard', () => {
       component.customerForm.setValue(VALID_FORM_VALUE);
 
       apiSpy.createBooking.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       component.submitBooking();
 
-      expect(alertSpy).toHaveBeenCalled();
+      expect(component.submitErrorMessage).toBe('Rezerwacja nie powiodła się. Spróbuj ponownie.');
       expect(component.selectedSlot).toBe(originalSlot);
       expect(component.currentStep).toBe(3);
     });

@@ -20,7 +20,9 @@ export interface PackageDetails {
 }
 
 const NAME_PATTERN = /^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]+$/;
-const PHONE_PATTERN = /^\d{9}$/;
+// Accepts plain "123456789" as well as the common "123 456 789" / "123-456-789" groupings;
+// normalized down to 9 raw digits before it's sent to the API (see submitBooking).
+const PHONE_PATTERN = /^\d{3}[\s-]?\d{3}[\s-]?\d{3}$/;
 
 @Component({
   selector: 'app-booking-wizard',
@@ -42,7 +44,9 @@ export class BookingWizard {
   selectedCategory: 'regular' | 'birthday' = 'regular';
 
   isLoadingSlots = false;
+  slotsLoadError = false;
   isSubmitting = false;
+  submitErrorMessage: string | null = null;
   successMessage = '';
   showTermsModal = false;
   hasOpenedTerms = false;
@@ -178,6 +182,22 @@ export class BookingWizard {
     return this.packagesList.find(p => p.type === this.selectedPackage);
   }
 
+  get compatibleSlotGroups(): { label: string; slots: TimeSlot[] }[] {
+    const buckets: { label: string; from: number; to: number; slots: TimeSlot[] }[] = [
+      { label: 'Rano', from: 0, to: 12, slots: [] },
+      { label: 'Popołudnie', from: 12, to: 17, slots: [] },
+      { label: 'Wieczór', from: 17, to: 24, slots: [] }
+    ];
+
+    for (const slot of this.availableSlotsCompatible) {
+      const hour = new Date(slot.startTime).getHours();
+      const bucket = buckets.find(b => hour >= b.from && hour < b.to) ?? buckets[buckets.length - 1];
+      bucket.slots.push(slot);
+    }
+
+    return buckets.filter(b => b.slots.length > 0);
+  }
+
   get selectedDateValue(): string {
     return typeof this.selectedDate === 'string'
       ? this.selectedDate
@@ -262,7 +282,11 @@ export class BookingWizard {
       })
       .filter(name => name.length > 0)
       .join(', ');
-    
+
+    if (!compatiblePackages) {
+      return 'Ten termin jest za krótki dla każdego z dostępnych pakietów.';
+    }
+
     return `Ten termin jest nie dostępny dla wybranego pakietu. Zmień pakiet na ${compatiblePackages}, aby go wybrać.`;
   }
 
@@ -289,7 +313,9 @@ export class BookingWizard {
     this.availableSlotsIncompatible = [];
     this.selectedSlot = null;
     this.successMessage = '';
+    this.submitErrorMessage = null;
     this.showPhoneContactWarning = false;
+    this.slotsLoadError = false;
 
     const minPersons = this.packagesList.find(p => p.type === pkg)?.minPersons ?? 8;
     const participantsCtrl = this.customerForm.get('participantsCount')!;
@@ -341,6 +367,7 @@ export class BookingWizard {
     this.availableSlotsIncompatible = [];
     this.selectedSlot = null;
     this.showPhoneContactWarning = false;
+    this.slotsLoadError = false;
 
     if (!date || this.selectedPackage === null) return;
 
@@ -351,21 +378,18 @@ export class BookingWizard {
 
     this.isLoadingSlots = true;
     this.bookingApiService.getAvailableSlots(date, this.selectedPackage).subscribe({
-      next: (slots) => { 
+      next: (slots) => {
         this.availableSlotsCompatible = slots.filter(s => this.isSlotCompatible(s));
         this.availableSlotsIncompatible = slots.filter(s => !this.isSlotCompatible(s));
-        this.isLoadingSlots = false; 
+        this.isLoadingSlots = false;
       },
-      error: () => { this.isLoadingSlots = false; window.alert('Could not load available time slots.'); }
+      error: () => { this.isLoadingSlots = false; this.slotsLoadError = true; }
     });
   }
 
   selectSlot(slot: TimeSlot): void {
-    if (!this.isSlotCompatible(slot)) {
-      window.alert(this.getIncompatibleSlotMessage(slot));
-      return;
-    }
     this.selectedSlot = slot;
+    this.submitErrorMessage = null;
     this.currentStep = 3;
   }
 
@@ -375,13 +399,14 @@ export class BookingWizard {
       return;
     }
 
+    this.submitErrorMessage = null;
     const fv = this.customerForm.getRawValue();
 
     const request: CreateBookingRequest = {
       firstName: fv.firstName.trim(),
       lastName: fv.lastName.trim(),
       email: fv.email.trim(),
-      phone: fv.phone.trim(),
+      phone: fv.phone.replace(/\D/g, ''),
       participantsCount: Number(fv.participantsCount),
       package: this.selectedPackage,
       startTime: this.selectedSlot.startTime,
@@ -402,7 +427,7 @@ export class BookingWizard {
 
         if (err.status === 409) {
           // Someone else booked this slot in the time it took to fill out the form.
-          window.alert('Ten termin został właśnie zarezerwowany przez kogoś innego. Wybierz proszę inny termin.');
+          this.submitErrorMessage = 'Ten termin został właśnie zarezerwowany przez kogoś innego. Wybierz proszę inny termin.';
           this.selectedSlot = null;
           this.currentStep = 2;
           if (this.selectedDate && this.selectedPackage !== null) {
@@ -411,7 +436,7 @@ export class BookingWizard {
           return;
         }
 
-        window.alert('Rezerwacja nie powiodła się. Spróbuj ponownie.');
+        this.submitErrorMessage = 'Rezerwacja nie powiodła się. Spróbuj ponownie.';
       }
     });
   }

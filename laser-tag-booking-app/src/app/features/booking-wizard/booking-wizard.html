@@ -19,6 +19,10 @@
     {{ successMessage }}
   </p>
 
+  <p *ngIf="submitErrorMessage" role="alert" class="submit-error-banner">
+    {{ submitErrorMessage }}
+  </p>
+
   <section *ngIf="currentStep === 1" aria-labelledby="step-1-title">
     <h2 id="step-1-title" style="margin-bottom: 1rem;">Wybierz pakiet</h2>
 
@@ -91,27 +95,35 @@
       />
     </div>
 
-    <div *ngIf="showPhoneContactWarning" class="error-text error-text--important" style="margin-top: 1rem;">
+    <div *ngIf="showPhoneContactWarning" class="error-text error-text--important" role="alert" style="margin-top: 1rem;">
       Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199
     </div>
 
     <ng-container *ngIf="!showPhoneContactWarning">
-      <p *ngIf="isLoadingSlots" class="loading-text">Ładowanie slotów...</p>
+      <p *ngIf="isLoadingSlots" class="loading-text" role="status">Ładowanie slotów...</p>
 
-      <ng-container *ngIf="!isLoadingSlots">
-        <ul class="slots-list-grid" *ngIf="availableSlotsCompatible.length > 0">
-          <li *ngFor="let slot of availableSlotsCompatible">
-            <button type="button" (click)="selectSlot(slot)">
-              {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
-            </button>
-          </li>
-        </ul>
+      <div *ngIf="!isLoadingSlots && slotsLoadError" class="error-text error-text--important" role="alert">
+        Nie udało się wczytać dostępnych terminów. Sprawdź połączenie z internetem i spróbuj ponownie.
+        <button type="button" class="retry-btn" (click)="onDateChange(selectedDateValue)">Spróbuj ponownie</button>
+      </div>
+
+      <ng-container *ngIf="!isLoadingSlots && !slotsLoadError">
+        <div class="slot-group" *ngFor="let group of compatibleSlotGroups">
+          <h3 class="slot-group__title">{{ group.label }}</h3>
+          <ul class="slots-list-grid">
+            <li *ngFor="let slot of group.slots">
+              <button type="button" (click)="selectSlot(slot)">
+                {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
+              </button>
+            </li>
+          </ul>
+        </div>
 
         <div *ngIf="availableSlotsIncompatible.length > 0" class="incompatible-slots-section">
           <p class="incompatible-slots-title">Dostępne terminy wymagające zmiany pakietu:</p>
           <ul class="slots-list-grid" style="margin-top: 0;">
             <li *ngFor="let slot of availableSlotsIncompatible" class="incompatible-slot-item">
-              <button type="button" class="slot-btn--incompatible" (click)="selectSlot(slot)" disabled>
+              <button type="button" class="slot-btn--incompatible" disabled>
                 {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
               </button>
               <span class="slot-tooltip">{{ getIncompatibleSlotDisplay(slot) }}</span>
@@ -148,28 +160,28 @@
 
       <div class="form-field">
         <label for="firstName">Imię</label>
-        <input id="firstName" type="text" formControlName="firstName" />
+        <input id="firstName" type="text" formControlName="firstName" autocomplete="given-name" />
         <small class="error-text" *ngIf="f('firstName')?.touched && f('firstName')?.hasError('required')">Imię jest wymagane.</small>
         <small class="error-text" *ngIf="f('firstName')?.touched && f('firstName')?.hasError('pattern')">Imię zawiera niedozwolone znaki.</small>
       </div>
 
       <div class="form-field">
         <label for="lastName">Nazwisko</label>
-        <input id="lastName" type="text" formControlName="lastName" />
+        <input id="lastName" type="text" formControlName="lastName" autocomplete="family-name" />
         <small class="error-text" *ngIf="f('lastName')?.touched && f('lastName')?.hasError('required')">Nazwisko jest wymagane.</small>
         <small class="error-text" *ngIf="f('lastName')?.touched && f('lastName')?.hasError('pattern')">Nazwisko zawiera niedozwolone znaki.</small>
       </div>
 
       <div class="form-field">
         <label for="email">Email</label>
-        <input id="email" type="email" formControlName="email" />
+        <input id="email" type="email" formControlName="email" autocomplete="email" />
         <small class="error-text" *ngIf="f('email')?.touched && f('email')?.hasError('required')">Email jest wymagany.</small>
         <small class="error-text" *ngIf="f('email')?.touched && f('email')?.hasError('email')">Niepoprawny format email.</small>
       </div>
 
       <div class="form-field">
         <label for="phone">Telefon</label>
-        <input id="phone" type="tel" formControlName="phone" placeholder="123456789" />
+        <input id="phone" type="tel" formControlName="phone" placeholder="123456789" autocomplete="tel" />
         <small class="error-text" *ngIf="f('phone')?.touched && f('phone')?.hasError('required')">Numer telefonu jest wymagany.</small>
         <small class="error-text" *ngIf="f('phone')?.touched && f('phone')?.hasError('pattern')">Proszę podać poprawny numer 123456789</small>
       </div>

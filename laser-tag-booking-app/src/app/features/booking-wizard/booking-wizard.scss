@@ -109,6 +109,17 @@ p[role='status'] {
   word-break: break-word;
 }
 
+.submit-error-banner {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #9f1239;
+  font-weight: 600;
+  word-break: break-word;
+}
+
 section {
   width: 100%;
   background: var(--surface);
@@ -140,7 +151,10 @@ section {
   border: none;
   background: transparent;
   border-radius: 8px;
+  min-height: 44px;
   padding: 0.3rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--primary);
@@ -182,6 +196,7 @@ section {
   background: transparent;
   flex: 1;
   border-radius: 12px;
+  min-height: 44px;
   padding: 0.6rem 0.5rem;
   font-size: 0.85rem;
   font-weight: 700;
@@ -394,9 +409,24 @@ input[type='date'] {
   position: relative;
 }
 
+.slot-group {
+  margin-top: 1.25rem;
+
+  &:first-child { margin-top: 1rem; }
+}
+
+.slot-group__title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 /* Grid Layout for Slots rows */
 .slots-list-grid {
-  margin: 1rem 0 0;
+  margin: 0.65rem 0 0;
   padding: 0;
   list-style: none;
   display: grid;
@@ -566,6 +596,23 @@ form { margin-top: 0.5rem; display: grid; gap: 0; }
 
 .error-text { display: block; margin-top: 0.4rem; font-size: 0.8rem; font-weight: 600; color: var(--error); line-height: 1.35; }
 .error-text--important { padding: 0.5rem 0.7rem; border-radius: 10px; background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; }
+
+.retry-btn {
+  appearance: none;
+  display: block;
+  margin-top: 0.6rem;
+  border: 1px solid #fda4af;
+  background: #ffffff;
+  color: #9f1239;
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 0.5rem 1rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover { background: #fff1f2; }
+}
 
 button[type='submit'] {
   margin-top: 0.5rem;
