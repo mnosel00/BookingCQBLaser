@@ -192,7 +192,7 @@
 
       <div class="form-field">
         <label for="participantsCount">Liczba uczestników</label>
-        <input id="participantsCount" type="number" min="1" formControlName="participantsCount" />
+        <input id="participantsCount" type="number" [attr.min]="minParticipants" max="26" formControlName="participantsCount" />
         <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('required')">Liczba uczestników jest wymagana.</small>
         <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('min')">
           Minimalna liczba uczestników dla tego pakietu wynosi {{ f('participantsCount')?.getError('min')?.min }}.

@@ -170,6 +170,10 @@ export class BookingWizard {
     return this.packagesList.filter(p => p.category === this.selectedCategory);
   }
 
+  get minParticipants(): number {
+    return this.selectedPackageDetails?.minPersons ?? 8;
+  }
+
   get selectedPackageDetails(): PackageDetails | undefined {
     return this.packagesList.find(p => p.type === this.selectedPackage);
   }
@@ -294,6 +298,9 @@ export class BookingWizard {
       Validators.min(minPersons),
       Validators.max(26)
     ]);
+    // Start the field at the package's minimum instead of leaving it at 1 (or
+    // a leftover value from a previously selected package).
+    participantsCtrl.setValue(minPersons);
     participantsCtrl.updateValueAndValidity();
 
     this.currentStep = 2;
