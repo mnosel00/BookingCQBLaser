@@ -61,6 +61,19 @@ describe('BookingWizard', () => {
     expect(createComponent()).toBeTruthy();
   });
 
+  it('defaults participantsCount to the package minimum on selection (10 for S1/U1, 8 for others)', () => {
+    const component = createComponent();
+
+    component.selectPackage(PackageType.S1);
+    expect(component.customerForm.get('participantsCount')?.value).toBe(10);
+
+    component.selectPackage(PackageType.S2);
+    expect(component.customerForm.get('participantsCount')?.value).toBe(8);
+
+    component.selectPackage(PackageType.U1);
+    expect(component.customerForm.get('participantsCount')?.value).toBe(10);
+  });
+
   it('splits slots into compatible/incompatible using durations fetched from the API', () => {
     const component = createComponent();
     component.selectedPackage = PackageType.Max; // needs 120 min per the fetched durations
