@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "laser-tag-booking-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "laser-tag-booking-app", "run", "start"],
+      "port": 4200
+    }
+  ]
+}
