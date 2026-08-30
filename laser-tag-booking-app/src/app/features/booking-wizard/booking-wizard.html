@@ -37,6 +37,10 @@
       </button>
     </div>
 
+    <p class="deposit-note">
+      💳 Rezerwacja wymaga zadatku <strong>300 zł</strong> płatnego online (+ 4 zł kosztu obsługi). Reszta płatna gotówką na miejscu.
+    </p>
+
     <div class="package-grid">
       <button type="button" class="package-card"
         *ngFor="let pkg of filteredPackages"
@@ -46,7 +50,7 @@
 
         <div class="package-card__top">
           <h3>{{ pkg.name }}</h3>
-          <p class="package-card__price">{{ pkg.price }} PLN</p>
+          <p class="package-card__price">{{ pkg.price }} PLN <span class="package-card__price-unit">/ os.</span></p>
         </div>
 
         <p class="package-card__duration">{{ pkg.duration }}</p>
@@ -177,7 +181,7 @@
         </label>
       </div>
 
-      <div class="form-field" [style.opacity]="f('isAdultGroup')?.value ? '0.5' : '1'" style="transition: opacity 0.2s ease;">
+      <div class="form-field" *ngIf="!f('isAdultGroup')?.value">
         <label for="ageRange">Przedział wiekowy uczestników (np. 11-14)</label>
         <input 
           id="ageRange" 
