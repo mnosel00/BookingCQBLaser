@@ -58,7 +58,7 @@ export class BookingWizard {
   // is the single source of truth for blocked duration, not a hardcoded client-side copy.
   private packageBlockMinutes: Partial<Record<PackageType, number>> = {};
 
-  readonly minDateValue: string = new Date().toISOString().slice(0, 10);
+  readonly minDateValue: string = this.toLocalIsoDate(new Date());
 
   readonly packagesList: PackageDetails[] = [
     {
@@ -226,8 +226,16 @@ export class BookingWizard {
 
   // The next bookable days (local ISO yyyy-mm-dd) for the date strip: calendar days
   // from today forward that pass isOnlineBookingAllowed, capped at dateStripDays and
-  // never scanning past the 6-month maxBookingDate guard. Pure function of "today".
-  get bookableDateStrip(): string[] {
+  // never scanning past the 6-month maxBookingDate guard. Computed once (a booking
+  // session is short-lived; we don't recompute across midnight) rather than rebuilt
+  // on every change-detection read from the template.
+  readonly bookableDateStrip: string[] = this.buildBookableDateStrip();
+
+  // Upper guard for the native "Inna data" fallback picker (~6 months out). There is
+  // no max-advance business rule; this only stops fat-finger far-future dates.
+  readonly maxBookingDate: string = this.toLocalIsoDate(this.sixMonthsFromToday());
+
+  private buildBookableDateStrip(): string[] {
     const out: string[] = [];
     const cursor = new Date();
     cursor.setHours(0, 0, 0, 0);
@@ -239,12 +247,6 @@ export class BookingWizard {
       cursor.setDate(cursor.getDate() + 1);
     }
     return out;
-  }
-
-  // Upper guard for the native "Inna data" fallback picker (~6 months out). There is
-  // no max-advance business rule; this only stops fat-finger far-future dates.
-  get maxBookingDate(): string {
-    return this.toLocalIsoDate(this.sixMonthsFromToday());
   }
 
   // True when the chosen date came from the native "Inna data" fallback (i.e. it is

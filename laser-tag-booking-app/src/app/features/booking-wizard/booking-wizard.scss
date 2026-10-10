@@ -264,7 +264,7 @@ section > h2,
   width: 100%;
   text-align: left;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, #1b2531 0%, #141b24 100%);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
   border-radius: 18px;
   min-height: 220px;
   padding: clamp(0.85rem, 4vw, 1.1rem);
@@ -691,7 +691,7 @@ form { margin-top: 0.5rem; display: grid; gap: 0; }
   padding: clamp(0.85rem, 4vw, 1.1rem);
   border-radius: 14px;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, #1b2531 0%, #161d27 100%);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
   box-sizing: border-box;
 }
 
