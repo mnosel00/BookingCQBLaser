@@ -14,6 +14,5 @@ import { Component, Input } from '@angular/core';
   styleUrl: './booking-hero.scss'
 })
 export class BookingHero {
-  @Input() eyebrow = 'ComboArena · Laserowy paintball';
-  @Input() title = 'Zarezerwuj swoją grę';
+  @Input() title = 'Zarezerwuj swoją grę w Comboarena.pl';
 }

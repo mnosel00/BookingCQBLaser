@@ -11,11 +11,15 @@
 
   /* ComboArena tactical-orange accent (sampled from comboarena.pl: #FF6900). */
   --primary: #ff6900;
+  --primary-rgb: 255, 105, 0; /* same accent as rgb triplet, for rgba(var(--primary-rgb), a) glows */
   --primary-strong: #cc5200;
   --primary-tint-bg: #fff4ea;
   --primary-tint-bg-2: #ffe8d4;
   --primary-border: #ffd0a8;
-  --ring: rgba(255, 105, 0, 0.22);
+  --ring: rgba(var(--primary-rgb), 0.22);
+
+  /* HUD/tech display font — hero title + step headings only (body/form text stays Inter). */
+  --font-display: 'Rajdhani', Inter, 'Segoe UI', system-ui, sans-serif;
 
   /* Dark branded shell (page background + text that sits directly on it). */
   --shell-track: rgba(255, 255, 255, 0.14);
@@ -81,7 +85,7 @@
   border-radius: 999px;
   background: linear-gradient(90deg, var(--primary), var(--primary-strong));
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 8px rgba(255, 105, 0, 0.45);
+  box-shadow: 0 0 8px rgba(var(--primary-rgb), 0.45);
 }
 
 .progress-bar__labels {
@@ -141,7 +145,7 @@ section {
 /* HUD/tech display font for step headings only; body & form text stay Inter. */
 section > h2,
 .step-nav h2 {
-  font-family: 'Rajdhani', Inter, 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-display);
   letter-spacing: 0.01em;
   text-transform: uppercase;
 }
@@ -232,7 +236,7 @@ section > h2,
   &.active {
     background: var(--primary);
     color: #ffffff;
-    box-shadow: 0 4px 14px rgba(255, 105, 0, 0.32);
+    box-shadow: 0 4px 14px rgba(var(--primary-rgb), 0.32);
   }
 }
 
@@ -264,7 +268,7 @@ section > h2,
   &.selected {
     border-color: var(--primary);
     background: linear-gradient(180deg, var(--primary-tint-bg) 0%, var(--primary-tint-bg-2) 100%);
-    box-shadow: 0 0 0 4px var(--ring), 0 16px 30px rgba(255, 105, 0, 0.2);
+    box-shadow: 0 0 0 4px var(--ring), 0 16px 30px rgba(var(--primary-rgb), 0.2);
   }
 
   h3 {
@@ -706,7 +710,7 @@ button[type='submit'] {
     border-color: var(--primary-border);
     color: var(--primary-strong);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 105, 0, 0.14);
+    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.14);
   }
 }
 
@@ -715,7 +719,7 @@ button[type='submit'] {
 .terms-link {
   color: var(--primary-strong);
   text-decoration: underline;
-  text-decoration-color: rgba(255, 105, 0, 0.4);
+  text-decoration-color: rgba(var(--primary-rgb), 0.4);
   text-underline-offset: 2px;
   cursor: pointer;
 

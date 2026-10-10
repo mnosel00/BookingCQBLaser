@@ -1,6 +1,6 @@
 <main class="booking-wizard" [class.booking-wizard--with-bar]="summaryBarMode !== 'hidden'">
 
-  <app-booking-hero title="Zarezerwuj swoją grę"></app-booking-hero>
+  <app-booking-hero></app-booking-hero>
 
   <div class="progress-bar-wrapper">
     <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="currentStep" aria-valuemin="1" aria-valuemax="3">
@@ -17,7 +17,7 @@
     <app-booking-summary-bar
       [mode]="summaryBarMode"
       [packageName]="selectedPackageDetails?.name ?? ''"
-      [totalCost]="totalCost"
+      [totalPrice]="totalCost"
       [depositAmount]="depositAmount"
     />
   }

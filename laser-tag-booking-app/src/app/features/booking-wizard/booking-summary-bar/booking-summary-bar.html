@@ -1,8 +1,4 @@
-<aside
-  class="summary-bar"
-  [class.summary-bar--collapsed]="mode === 'collapsed'"
-  aria-label="Podsumowanie rezerwacji"
->
+<aside class="summary-bar" aria-label="Podsumowanie rezerwacji">
   <div class="summary-bar__item summary-bar__item--package">
     <span class="summary-bar__label">Pakiet</span>
     <span class="summary-bar__value">{{ packageName }}</span>
@@ -11,7 +7,7 @@
   @if (mode === 'full') {
     <div class="summary-bar__item">
       <span class="summary-bar__label">Suma</span>
-      <span class="summary-bar__value summary-bar__value--total">{{ totalCost }} PLN</span>
+      <span class="summary-bar__value summary-bar__value--total">{{ totalPrice }} PLN</span>
     </div>
     <div class="summary-bar__item">
       <span class="summary-bar__label">Zadatek teraz</span>

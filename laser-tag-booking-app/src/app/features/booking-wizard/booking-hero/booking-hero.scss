@@ -23,8 +23,8 @@
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(640px 300px at 85% -20%, rgba(255, 105, 0, 0.28) 0%, transparent 60%),
-    radial-gradient(520px 320px at 0% 120%, rgba(255, 105, 0, 0.12) 0%, transparent 55%),
+    radial-gradient(640px 300px at 85% -20%, rgba(var(--primary-rgb, 255, 105, 0), 0.28) 0%, transparent 60%),
+    radial-gradient(520px 320px at 0% 120%, rgba(var(--primary-rgb, 255, 105, 0), 0.12) 0%, transparent 55%),
     linear-gradient(135deg, #10161d 0%, #0b0f14 55%, #0a0d11 100%);
 }
 
@@ -45,19 +45,10 @@
   min-width: 0;
 }
 
-.hero__eyebrow {
-  margin: 0;
-  font-family: 'Rajdhani', Inter, 'Segoe UI', system-ui, sans-serif;
-  font-weight: 600;
-  font-size: clamp(0.72rem, 3vw, 0.9rem);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--primary, #ff6900);
-}
-
 .hero__title {
   margin: 0;
-  font-family: 'Rajdhani', Inter, 'Segoe UI', system-ui, sans-serif;
+  /* Rajdhani display font (inherited --font-display token); hero title only. */
+  font-family: var(--font-display, 'Rajdhani', Inter, 'Segoe UI', system-ui, sans-serif);
   font-weight: 700;
   font-size: clamp(1.7rem, 7vw, 3rem);
   line-height: 1.05;

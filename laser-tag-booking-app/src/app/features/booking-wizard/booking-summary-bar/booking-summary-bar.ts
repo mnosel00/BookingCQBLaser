@@ -23,6 +23,6 @@ export type SummaryBarMode = 'hidden' | 'full' | 'collapsed';
 export class BookingSummaryBar {
   @Input() mode: Exclude<SummaryBarMode, 'hidden'> = 'full';
   @Input() packageName = '';
-  @Input() totalCost = 0;
+  @Input() totalPrice = 0;
   @Input() depositAmount = 0;
 }
