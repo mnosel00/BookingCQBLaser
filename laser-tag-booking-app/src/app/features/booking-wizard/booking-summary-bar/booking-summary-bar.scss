@@ -1,0 +1,71 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.summary-bar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1rem;
+  /* Light, high-contrast surface so prices stay legible against the dark shell.
+     Brand tokens (--primary-*) are inherited from the wizard host. */
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--primary-border, #ffd0a8);
+  color: var(--text, #0f172a);
+  min-width: 0;
+
+  /* Mobile-first: pinned to the bottom, within thumb reach near the actions. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  border-radius: 14px 14px 0 0;
+  padding-bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Desktop: sits inline at the top of the step rather than pinned. */
+@media (min-width: 640px) {
+  .summary-bar {
+    position: static;
+    border-radius: 14px;
+    padding-bottom: 0.7rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  }
+}
+
+.summary-bar__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+/* Package label sits left; the totals are pushed to the trailing edge. */
+.summary-bar__item--package {
+  margin-right: auto;
+}
+
+.summary-bar__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted, #64748b);
+}
+
+.summary-bar__value {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text, #0f172a);
+  word-break: break-word;
+}
+
+.summary-bar__value--total {
+  color: var(--primary-strong, #cc5200);
+  font-size: 1.05rem;
+}

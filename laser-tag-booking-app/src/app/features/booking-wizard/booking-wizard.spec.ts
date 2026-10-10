@@ -186,6 +186,36 @@ describe('BookingWizard', () => {
     });
   });
 
+  describe('summaryBarMode', () => {
+    it('is hidden on step 1 (package comparison, no bar)', () => {
+      const component = createComponent();
+      component.selectPackage(PackageType.S1); // advances to step 2 and selects a package
+      component.currentStep = 1;
+      expect(component.summaryBarMode).toBe('hidden');
+    });
+
+    it('is hidden before any package is selected', () => {
+      const component = createComponent();
+      component.currentStep = 2;
+      expect(component.selectedPackage).toBeNull();
+      expect(component.summaryBarMode).toBe('hidden');
+    });
+
+    it('is full on step 2 with a package selected', () => {
+      const component = createComponent();
+      component.selectPackage(PackageType.S1);
+      expect(component.currentStep).toBe(2);
+      expect(component.summaryBarMode).toBe('full');
+    });
+
+    it('is collapsed on step 3', () => {
+      const component = createComponent();
+      component.selectPackage(PackageType.S1);
+      component.currentStep = 3;
+      expect(component.summaryBarMode).toBe('collapsed');
+    });
+  });
+
   describe('on a generic booking failure', () => {
     it('shows an inline error message but does not reset the wizard state', () => {
       const component = createComponent();
