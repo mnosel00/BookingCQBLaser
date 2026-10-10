@@ -8,6 +8,8 @@ import {
 } from '@angular/forms';
 import { BookingApiService } from '../../services/booking-api';
 import { CreateBookingRequest, PackageType, TimeSlot } from '../../models/booking.models';
+import { BookingHero } from './booking-hero/booking-hero';
+import { BookingSummaryBar } from './booking-summary-bar/booking-summary-bar';
 
 export interface PackageDetails {
   type: PackageType;
@@ -27,7 +29,7 @@ const PHONE_PATTERN = /^\d{3}[\s-]?\d{3}[\s-]?\d{3}$/;
 @Component({
   selector: 'app-booking-wizard',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, DatePipe],
+  imports: [CommonModule, ReactiveFormsModule, DatePipe, BookingHero, BookingSummaryBar],
   templateUrl: './booking-wizard.html',
   styleUrl: './booking-wizard.scss'
 })
@@ -206,6 +208,17 @@ export class BookingWizard {
 
   get progressPercent(): number {
     return (this.currentStep / 3) * 100;
+  }
+
+  // Drives the sticky summary bar's per-step content. Pure function of currentStep +
+  // whether a Package is selected; the bar component itself holds no such logic.
+  //   step 1 / no Package → hidden   (uncluttered Package comparison)
+  //   step 2              → full      (Package + Total Price + Deposit)
+  //   step 3              → collapsed (Package name only; the cost receipt owns the numbers)
+  get summaryBarMode(): 'hidden' | 'full' | 'collapsed' {
+    if (this.selectedPackage === null || this.currentStep === 1) return 'hidden';
+    if (this.currentStep === 2) return 'full';
+    return 'collapsed';
   }
 
   get numericPrice(): number {

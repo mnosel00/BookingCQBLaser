@@ -1,8 +1,6 @@
-<main class="booking-wizard">
+<main class="booking-wizard" [class.booking-wizard--with-bar]="summaryBarMode !== 'hidden'">
 
-  <header>
-    <h1>Zarezerwuj swoją grę w Comboarena.pl</h1>
-  </header>
+  <app-booking-hero title="Zarezerwuj swoją grę"></app-booking-hero>
 
   <div class="progress-bar-wrapper">
     <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="currentStep" aria-valuemin="1" aria-valuemax="3">
@@ -14,6 +12,15 @@
       <span [class.active]="currentStep >= 3">3. Dane</span>
     </div>
   </div>
+
+  @if (summaryBarMode !== 'hidden') {
+    <app-booking-summary-bar
+      [mode]="summaryBarMode"
+      [packageName]="selectedPackageDetails?.name ?? ''"
+      [totalCost]="totalCost"
+      [depositAmount]="depositAmount"
+    />
+  }
 
   <p *ngIf="successMessage" role="status">
     {{ successMessage }}
