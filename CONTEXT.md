@@ -43,3 +43,11 @@ _Avoid_: Total cost
 **Remaining Balance**
 The amount owed on-site: Total Price minus the Deposit (300 PLN — the Service Fee is never subtracted here).
 _Avoid_: Balance due
+
+**Time Slot**
+A bookable start–end window on a specific date for a specific Package, offered to the customer when choosing a time. A Time Slot is only offered when the arena is free for that Package's full blocked duration; selecting one and paying the Deposit turns it into a Booking.
+_Avoid_: Slot (bare), Timeslot, Session
+
+**Daypart**
+The part-of-day grouping used to present Time Slots to the customer: *Rano* (before 12:00), *Popołudnie* (12:00–17:00), *Wieczór* (from 17:00 on). A presentation grouping only — it carries no pricing, duration, or availability meaning of its own.
+_Avoid_: Time of day, Shift, Period

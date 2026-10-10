@@ -58,7 +58,7 @@ export class BookingWizard {
   // is the single source of truth for blocked duration, not a hardcoded client-side copy.
   private packageBlockMinutes: Partial<Record<PackageType, number>> = {};
 
-  readonly minDateValue: string = new Date().toISOString().slice(0, 10);
+  readonly minDateValue: string = this.toLocalIsoDate(new Date());
 
   readonly packagesList: PackageDetails[] = [
     {
@@ -219,6 +219,68 @@ export class BookingWizard {
     if (this.selectedPackage === null || this.currentStep === 1) return 'hidden';
     if (this.currentStep === 2) return 'full';
     return 'collapsed';
+  }
+
+  // How many days the branded date strip offers before the "Inna data" fallback.
+  readonly dateStripDays = 21;
+
+  // The next bookable days (local ISO yyyy-mm-dd) for the date strip: calendar days
+  // from today forward that pass isOnlineBookingAllowed, capped at dateStripDays and
+  // never scanning past the 6-month maxBookingDate guard. Computed once (a booking
+  // session is short-lived; we don't recompute across midnight) rather than rebuilt
+  // on every change-detection read from the template.
+  readonly bookableDateStrip: string[] = this.buildBookableDateStrip();
+
+  // Upper guard for the native "Inna data" fallback picker (~6 months out). There is
+  // no max-advance business rule; this only stops fat-finger far-future dates.
+  readonly maxBookingDate: string = this.toLocalIsoDate(this.sixMonthsFromToday());
+
+  private buildBookableDateStrip(): string[] {
+    const out: string[] = [];
+    const cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    const hardStop = this.sixMonthsFromToday();
+    while (out.length < this.dateStripDays && cursor.getTime() <= hardStop.getTime()) {
+      if (this.isOnlineBookingAllowed(new Date(cursor))) {
+        out.push(this.toLocalIsoDate(cursor));
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return out;
+  }
+
+  // True when the chosen date came from the native "Inna data" fallback (i.e. it is
+  // not one of the quick-pick strip days), so that chip can show as active.
+  get isCustomDateSelected(): boolean {
+    return !!this.selectedDateValue && !this.bookableDateStrip.includes(this.selectedDateValue);
+  }
+
+  private readonly polishDowShort = ['Niedz', 'Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob'];
+
+  // Localised day-of-week / day labels for a strip chip, parsed as a local date so the
+  // weekday and day never drift by a timezone offset.
+  dateChipDow(iso: string): string {
+    return this.polishDowShort[new Date(iso + 'T00:00:00').getDay()];
+  }
+
+  dateChipDay(iso: string): string {
+    const d = new Date(iso + 'T00:00:00');
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private sixMonthsFromToday(): Date {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setMonth(d.getMonth() + 6);
+    return d;
+  }
+
+  // Local calendar date as yyyy-mm-dd, without the UTC shift toISOString would apply.
+  private toLocalIsoDate(d: Date): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   get numericPrice(): number {

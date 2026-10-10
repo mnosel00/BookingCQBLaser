@@ -91,15 +91,35 @@
       <span class="summary-value">{{ selectedPackageDetails.name }} - {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
     </div>
 
-    <div class="form-field">
-      <label for="bookingDate">Data</label>
-      <input
-        id="bookingDate"
-        type="date"
-        [min]="minDateValue"
-        [value]="selectedDateValue"
-        (change)="onDateChange(($any($event.target)).value)"
-      />
+    <div class="date-picker">
+      <span class="date-picker__label" id="date-strip-label">Data</span>
+      <div class="date-strip" role="group" aria-labelledby="date-strip-label">
+        <button
+          type="button"
+          class="date-chip"
+          *ngFor="let d of bookableDateStrip"
+          [class.date-chip--active]="selectedDateValue === d"
+          [attr.aria-pressed]="selectedDateValue === d"
+          (click)="onDateChange(d)"
+        >
+          <span class="date-chip__dow">{{ dateChipDow(d) }}</span>
+          <span class="date-chip__day">{{ dateChipDay(d) }}</span>
+        </button>
+
+        <label class="date-chip date-chip--custom" [class.date-chip--active]="isCustomDateSelected">
+          <span class="date-chip__dow">Inna</span>
+          <span class="date-chip__day">data</span>
+          <input
+            type="date"
+            class="date-chip__native"
+            aria-label="Wybierz inną datę"
+            [min]="minDateValue"
+            [max]="maxBookingDate"
+            [value]="selectedDateValue"
+            (change)="onDateChange(($any($event.target)).value)"
+          />
+        </label>
+      </div>
     </div>
 
     <div *ngIf="showPhoneContactWarning" class="error-text error-text--important" role="alert" style="margin-top: 1rem;">
@@ -119,8 +139,9 @@
           <h3 class="slot-group__title">{{ group.label }}</h3>
           <ul class="slots-list-grid">
             <li *ngFor="let slot of group.slots">
-              <button type="button" (click)="selectSlot(slot)">
-                {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
+              <button type="button" class="slot-tile" (click)="selectSlot(slot)">
+                <span class="slot-tile__start">{{ slot.startTime | date:'HH:mm' }}</span>
+                <span class="slot-tile__end">do {{ slot.endTime | date:'HH:mm' }}</span>
               </button>
             </li>
           </ul>
@@ -130,8 +151,9 @@
           <p class="incompatible-slots-title">Dostępne terminy wymagające zmiany pakietu:</p>
           <ul class="slots-list-grid" style="margin-top: 0;">
             <li *ngFor="let slot of availableSlotsIncompatible" class="incompatible-slot-item">
-              <button type="button" class="slot-btn--incompatible" disabled>
-                {{ slot.startTime | date:'HH:mm' }} - {{ slot.endTime | date:'HH:mm' }}
+              <button type="button" class="slot-tile slot-tile--incompatible" disabled>
+                <span class="slot-tile__start">{{ slot.startTime | date:'HH:mm' }}</span>
+                <span class="slot-tile__end">do {{ slot.endTime | date:'HH:mm' }}</span>
               </button>
               <span class="slot-tooltip">{{ getIncompatibleSlotDisplay(slot) }}</span>
             </li>
