@@ -216,6 +216,17 @@ describe('BookingWizard', () => {
     });
   });
 
+  describe('Total Price (the SUMA shown on step 2 once participants are chosen)', () => {
+    it('is the package per-person price multiplied by the chosen participant count', () => {
+      const component = createComponent();
+      component.selectPackage(PackageType.S2); // 65 PLN/os, defaults to the minimum (8)
+      expect(component.totalCost).toBe(65 * 8);
+
+      component.customerForm.get('participantsCount')?.setValue(12);
+      expect(component.totalCost).toBe(65 * 12);
+    });
+  });
+
   describe('bookableDateStrip (branded date-strip options)', () => {
     it('offers at least one and at most dateStripDays entries', () => {
       const component = createComponent();
