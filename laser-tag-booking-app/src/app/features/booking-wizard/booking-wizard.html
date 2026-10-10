@@ -91,6 +91,20 @@
       <span class="summary-value">{{ selectedPackageDetails.name }} - {{ selectedPackageDetails.price }} PLN / {{ selectedPackageDetails.duration }}</span>
     </div>
 
+    <!-- Participant count lives on step 2 (before slot choice) so the summary bar's
+         Total Price reflects the real, chosen number of Participants rather than a default guess. -->
+    <div class="form-field" [formGroup]="customerForm">
+      <label for="participantsCount">Liczba uczestników</label>
+      <input id="participantsCount" type="number" [attr.min]="minParticipants" max="26" formControlName="participantsCount" />
+      <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('required')">Liczba uczestników jest wymagana.</small>
+      <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('min')">
+        Minimalna liczba uczestników dla tego pakietu wynosi {{ f('participantsCount')?.getError('min')?.min }}.
+      </small>
+      <small class="error-text error-text--important" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('max')">
+        W celu rezerwacji dla grupy powyżej 26 osób prosimy o dokonywanie rezerwacji telefonicznie pod numerem +48 509 595 199.
+      </small>
+    </div>
+
     <div class="date-picker">
       <span class="date-picker__label" id="date-strip-label">Data</span>
       <div class="date-strip" role="group" aria-labelledby="date-strip-label">
@@ -232,18 +246,6 @@
         />
         <small class="error-text" *ngIf="f('ageRange')?.enabled && f('ageRange')?.touched && f('ageRange')?.hasError('required')">
           Przedział wiekowy jest wymagany dla grup niepełnoletnich.
-        </small>
-      </div>
-
-      <div class="form-field">
-        <label for="participantsCount">Liczba uczestników</label>
-        <input id="participantsCount" type="number" [attr.min]="minParticipants" max="26" formControlName="participantsCount" />
-        <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('required')">Liczba uczestników jest wymagana.</small>
-        <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('min')">
-          Minimalna liczba uczestników dla tego pakietu wynosi {{ f('participantsCount')?.getError('min')?.min }}.
-        </small>
-        <small class="error-text error-text--important" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('max')">
-          W celu rezerwacji dla grupy powyżej 26 osób prosimy o dokonywanie rezerwacji telefonicznie pod numerem +48 509 595 199.
         </small>
       </div>
 
