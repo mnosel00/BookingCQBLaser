@@ -10,11 +10,11 @@
   gap: 0.5rem 1.25rem;
   flex-wrap: wrap;
   padding: 0.7rem 1rem;
-  /* Light, high-contrast surface so prices stay legible against the dark shell.
-     Brand tokens (--primary-*) are inherited from the wizard host. */
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--primary-border, #ffd0a8);
-  color: var(--text, #0f172a);
+  /* Dark elevated surface so prices stay legible against the shell (AA, see ADR 0001).
+     Brand tokens are inherited from the wizard host. */
+  background: var(--surface-2, #1b2531);
+  border: 1px solid var(--primary-border, rgba(255, 105, 0, 0.55));
+  color: var(--text, #e8ecf1);
   min-width: 0;
 
   /* Mobile-first: pinned to the bottom, within thumb reach near the actions. */
@@ -55,17 +55,17 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--muted, #64748b);
+  color: var(--muted, #a7b4c2);
 }
 
 .summary-bar__value {
   font-size: 0.95rem;
   font-weight: 800;
-  color: var(--text, #0f172a);
+  color: var(--text, #e8ecf1);
   word-break: break-word;
 }
 
 .summary-bar__value--total {
-  color: var(--primary-strong, #cc5200);
+  color: var(--accent-text, #ff9a52);
   font-size: 1.05rem;
 }

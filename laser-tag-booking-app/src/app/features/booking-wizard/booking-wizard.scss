@@ -1,22 +1,28 @@
 :host {
-  /* Light surfaces for the form cards (legibility is protected on these). */
-  --surface: #ffffff;
-  --surface-soft: #f8fafc;
-  --text: #0f172a;
-  --muted: #64748b;
-  --border: #e2e8f0;
-  --success-bg: #ecfdf3;
-  --success-text: #166534;
-  --error: #dc2626;
+  /* Dark form surfaces. Legibility is enforced to WCAG AA on these — see ADR 0001
+     (docs/adr/0001-dark-booking-form.md): this reverses issue #2's light surfaces. */
+  --surface: #141b24;        /* step panels / cards */
+  --surface-2: #1b2531;      /* elevated inner blocks (receipt, summary bar, tiles) */
+  --surface-soft: #0f151c;   /* recessed (inputs, chips, empty states) */
+  --text: #e8ecf1;           /* body text */
+  --muted: #a7b4c2;          /* secondary text (AA on --surface) */
+  --label: #cbd5e1;          /* field labels */
+  --placeholder: #8695a6;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --success-bg: rgba(34, 197, 94, 0.14);
+  --success-text: #86efac;
+  --error: #fca5a5;
 
   /* ComboArena tactical-orange accent (sampled from comboarena.pl: #FF6900). */
   --primary: #ff6900;
-  --primary-rgb: 255, 105, 0; /* same accent as rgb triplet, for rgba(var(--primary-rgb), a) glows */
-  --primary-strong: #cc5200;
-  --primary-tint-bg: #fff4ea;
-  --primary-tint-bg-2: #ffe8d4;
-  --primary-border: #ffd0a8;
-  --ring: rgba(var(--primary-rgb), 0.22);
+  --primary-rgb: 255, 105, 0; /* accent as rgb triplet for rgba(var(--primary-rgb), a) glows */
+  --primary-strong: #e35f00;  /* deeper orange for gradient fills (white text sits on top) */
+  --accent-text: #ff9a52;     /* lighter orange reserved for accent TEXT on dark (AA) */
+  --primary-tint-bg: rgba(255, 105, 0, 0.12);
+  --primary-tint-bg-2: rgba(255, 105, 0, 0.22);
+  --primary-border: rgba(255, 105, 0, 0.55);
+  --ring: rgba(var(--primary-rgb), 0.28);
 
   /* HUD/tech display font — hero title + step headings only (body/form text stays Inter). */
   --font-display: 'Rajdhani', Inter, 'Segoe UI', system-ui, sans-serif;
@@ -25,6 +31,8 @@
   --shell-track: rgba(255, 255, 255, 0.14);
   --on-shell: #e5e7eb;
   --on-shell-muted: #94a3b8;
+
+  color-scheme: dark; /* native date fallback picker + scrollbars render dark */
 
   display: block;
   width: 100%;
@@ -47,7 +55,7 @@
 
 .booking-wizard {
   /* Transparent shell container: the dark page background shows through here, while
-     the hero and each step <section> provide their own (dark / light) surfaces. */
+     the hero and each step <section> provide their own surfaces. */
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
@@ -98,11 +106,11 @@
   span {
     font-size: clamp(0.7rem, 2.5vw, 0.85rem);
     font-weight: 600;
-    color: #94a3b8;
+    color: var(--on-shell-muted);
     transition: color 0.3s ease;
     text-align: center;
     line-height: 1.2;
-    flex: 1; 
+    flex: 1;
 
     &:first-child { text-align: left; }
     &:last-child { text-align: right; }
@@ -114,7 +122,7 @@ p[role='status'] {
   margin: 0;
   padding: 0.75rem 1rem;
   border-radius: 12px;
-  border: 1px solid #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.4);
   background: var(--success-bg);
   color: var(--success-text);
   font-weight: 600;
@@ -125,9 +133,9 @@ p[role='status'] {
   margin: 0;
   padding: 0.75rem 1rem;
   border-radius: 12px;
-  border: 1px solid #fecdd3;
-  background: #fff1f2;
-  color: #9f1239;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(220, 38, 38, 0.14);
+  color: #fca5a5;
   font-weight: 600;
   word-break: break-word;
 }
@@ -138,7 +146,8 @@ section {
   border: 1px solid var(--border);
   border-radius: clamp(14px, 3vw, 18px);
   padding: clamp(0.85rem, 3.5vw, 1.25rem);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  color: var(--text);
   min-width: 0;
 }
 
@@ -177,7 +186,7 @@ section > h2,
   align-items: center;
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--accent-text);
   cursor: pointer;
   transition: all 0.18s ease;
   white-space: nowrap;
@@ -196,14 +205,14 @@ section > h2,
   flex-direction: column;
   gap: 0.3rem;
   margin-bottom: 1.25rem;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 0.3rem;
   width: 100%;
-  
+
   @media (min-width: 480px) {
-    flex-direction: row; 
+    flex-direction: row;
     width: fit-content;
     border-radius: 999px;
     margin-inline: auto;
@@ -254,8 +263,8 @@ section > h2,
   appearance: none;
   width: 100%;
   text-align: left;
-  border: 1px solid #dbe4f0;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #1b2531 0%, #141b24 100%);
   border-radius: 18px;
   min-height: 220px;
   padding: clamp(0.85rem, 4vw, 1.1rem);
@@ -263,19 +272,19 @@ section > h2,
   flex-direction: column;
   gap: 0.65rem;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 
   &.selected {
     border-color: var(--primary);
-    background: linear-gradient(180deg, var(--primary-tint-bg) 0%, var(--primary-tint-bg-2) 100%);
-    box-shadow: 0 0 0 4px var(--ring), 0 16px 30px rgba(var(--primary-rgb), 0.2);
+    background: linear-gradient(180deg, var(--primary-tint-bg-2) 0%, var(--primary-tint-bg) 100%);
+    box-shadow: 0 0 0 3px var(--ring), 0 16px 30px rgba(var(--primary-rgb), 0.18);
   }
 
   h3 {
     margin: 0;
     font-size: clamp(1rem, 4vw, 1.06rem);
     font-weight: 800;
-    color: #0f172a;
+    color: var(--text);
   }
 }
 
@@ -284,30 +293,30 @@ section > h2,
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.4rem;
-  flex-wrap: wrap; 
+  flex-wrap: wrap;
 }
 
 .package-card__price {
   margin: 0;
   font-size: clamp(1rem, 4vw, 1.1rem);
   font-weight: 900;
-  color: var(--primary-strong);
+  color: var(--accent-text);
   white-space: normal;
 }
 
 .package-card__price-unit {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--muted);
 }
 
 .deposit-note {
   margin: -0.5rem 0 1rem;
   padding: 0.65rem 0.9rem;
   border-radius: 12px;
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
-  color: #1e3a8a;
+  border: 1px solid rgba(var(--primary-rgb), 0.3);
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--text);
   font-size: 0.85rem;
   font-weight: 600;
   line-height: 1.4;
@@ -315,7 +324,7 @@ section > h2,
 
 .package-card__duration {
   margin: 0;
-  color: var(--primary-strong);
+  color: var(--accent-text);
   font-weight: 700;
   font-size: 0.92rem;
 }
@@ -332,7 +341,7 @@ section > h2,
     align-items: flex-start;
     gap: 0.45rem;
     margin: 0;
-    color: #475569;
+    color: var(--muted);
     font-size: 0.9rem;
     line-height: 1.35;
   }
@@ -346,32 +355,32 @@ section > h2,
   border-radius: 999px;
   display: inline-grid;
   place-items: center;
-  background: #ecfdf3;
-  color: #16a34a;
-  border: 1px solid #86efac;
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
   font-size: 0.74rem;
 }
 
 .package-card__badge {
   margin: auto 0 0;
-  align-self: stretch; 
+  align-self: stretch;
   text-align: center;
   padding: 0.4rem 0.5rem;
   border-radius: 999px;
-  border: 1px solid #f59e0b;
-  background: #fffbeb;
-  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
   line-height: 1.3;
-  white-space: normal; 
+  white-space: normal;
 }
 
 /* Step 2 & 3 Summaries */
 .selected-package-summary {
   display: flex;
-  flex-direction: column; 
+  flex-direction: column;
   align-items: flex-start;
   gap: 0.4rem;
   margin-bottom: 1.25rem;
@@ -380,7 +389,7 @@ section > h2,
   border: 1px solid var(--primary-border);
   border-radius: 12px;
   width: 100%;
-  
+
   @media (min-width: 480px) {
     flex-direction: row;
     align-items: center;
@@ -390,7 +399,7 @@ section > h2,
 
 .summary-label { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
 .summary-value { font-size: 0.95rem; font-weight: 800; color: var(--text); word-break: break-word; }
-.summary-slot { font-size: 0.88rem; font-weight: 700; color: var(--primary-strong); }
+.summary-slot { font-size: 0.88rem; font-weight: 700; color: var(--accent-text); }
 
 @media (min-width: 480px) { .summary-slot { margin-left: auto; } }
 
@@ -399,21 +408,22 @@ label {
   margin-bottom: 0.4rem;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--label);
 }
 
-/* CLEANUP & FIXED: Inputs global sanitization against horizontal overflows */
-input[type='date'], 
-input[type='text'], 
-input[type='email'], 
-input[type='tel'], 
+/* Inputs: dark fills, light text; sanitised against horizontal overflow */
+input[type='date'],
+input[type='text'],
+input[type='email'],
+input[type='tel'],
 input[type='number'] {
   display: block;
   width: 100%;
   min-width: 0;
-  max-width: 100%; 
-  border: 1px solid #cbd5e1;
-  background: #fff;
+  max-width: 100%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-soft);
+  color: var(--text);
   border-radius: 12px;
   padding: 0.75rem 0.9rem;
   font-size: 16px;
@@ -421,12 +431,106 @@ input[type='number'] {
   box-sizing: border-box;
   -webkit-appearance: none;
   appearance: none;
+
+  &::placeholder { color: var(--placeholder); }
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
 }
 
 /* Specific native adjustments to override mobile iOS safe-padding defaults */
 input[type='date'] {
   min-height: 2.75rem;
   position: relative;
+}
+
+/* Branded date strip (primary date picker) + native "Inna data" fallback */
+.date-picker {
+  width: 100%;
+  margin-bottom: 1.25rem;
+}
+
+.date-picker__label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--label);
+}
+
+.date-strip {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.45rem;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.date-chip {
+  position: relative;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  min-width: 58px;
+  min-height: 62px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover { border-color: var(--primary-border); }
+}
+
+.date-chip__dow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.date-chip__day {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.date-chip--active {
+  border-color: var(--primary);
+  background: linear-gradient(180deg, var(--primary-tint-bg-2), var(--primary-tint-bg));
+  box-shadow: 0 0 0 3px var(--ring);
+
+  .date-chip__dow { color: var(--accent-text); }
+}
+
+.date-chip--custom { border-style: dashed; }
+
+/* Native date input overlaid invisibly on the custom chip so the OS picker opens on tap.
+   Specificity (0,2,1) intentionally overrides the global input[type='date'] rule. */
+.date-chip--custom input[type='date'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .slot-group {
@@ -444,34 +548,71 @@ input[type='date'] {
   letter-spacing: 0.03em;
 }
 
-/* Grid Layout for Slots rows */
+/* Grid of modern slot tiles */
 .slots-list-grid {
   margin: 0.65rem 0 0;
   padding: 0;
   list-style: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 0.6rem;
 
   @media (min-width: 480px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (min-width: 768px) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
-  li button {
-    width: 100%;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 999px;
-    padding: 0.75rem 0.25rem;
-    font-weight: 800;
-    font-size: 0.95rem;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-    cursor: pointer;
-    transition: all 0.2s ease;
+.slot-tile {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 62px;
+  padding: 0.6rem 0.4rem;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s ease;
 
-    &:hover {
-      border-color: var(--primary);
-      background: var(--primary);
-      color: #ffffff;
-    }
+  &:hover {
+    border-color: var(--primary);
+    background: linear-gradient(180deg, var(--primary-tint-bg-2), var(--primary-tint-bg));
+    box-shadow: 0 0 0 3px var(--ring);
+
+    .slot-tile__end { color: var(--accent-text); }
+  }
+}
+
+.slot-tile__start {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.slot-tile__end {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.slot-tile--incompatible {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px dashed rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+  cursor: not-allowed;
+  opacity: 0.7;
+
+  .slot-tile__start,
+  .slot-tile__end { color: #fca5a5; }
+
+  &:hover {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: rgba(248, 113, 113, 0.4);
+    box-shadow: none;
   }
 }
 
@@ -479,15 +620,15 @@ input[type='date'] {
 .incompatible-slots-section {
   margin-top: 1.5rem;
   padding: 1rem;
-  border: 1px dashed #fca5a5;
+  border: 1px dashed rgba(248, 113, 113, 0.35);
   border-radius: 12px;
-  background: #fef2f2;
+  background: rgba(220, 38, 38, 0.08);
 
   .incompatible-slots-title {
     margin: 0 0 0.75rem;
     font-size: 0.9rem;
     font-weight: 600;
-    color: #991b1b;
+    color: #fca5a5;
   }
 }
 
@@ -497,20 +638,6 @@ input[type='date'] {
   flex-direction: column;
   gap: 0.4rem;
   align-items: flex-start;
-}
-
-.slot-btn--incompatible {
-  width: 100%;
-  background: #fecaca;
-  border: 2px dashed #fca5a5;
-  border-radius: 999px;
-  padding: 0.75rem 0.25rem;
-  font-weight: 800;
-  font-size: 0.95rem;
-  color: #7f1d1d;
-  cursor: not-allowed;
-  opacity: 0.65;
-  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
 }
 
 .slot-tooltip {
@@ -528,7 +655,7 @@ input[type='date'] {
   width: max-content;
   max-width: 200px;
   z-index: 10;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 
   @media (min-width: 480px) {
@@ -548,7 +675,7 @@ input[type='date'] {
   margin-top: 0.75rem;
   padding: 0.8rem;
   border-radius: 12px;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--border-strong);
   color: var(--muted);
   background: var(--surface-soft);
 }
@@ -557,23 +684,23 @@ input[type='date'] {
 form { margin-top: 0.5rem; display: grid; gap: 0; }
 .form-field { width: 100%; margin-bottom: 1.25rem; display: flex; flex-direction: column; min-width: 0; }
 
-/* Cost receipt component */
+/* Cost receipt component (numbers unchanged; dark surface only) */
 .booking-cost-summary {
   width: 100%;
   margin: 0 0 1.25rem;
   padding: clamp(0.85rem, 4vw, 1.1rem);
   border-radius: 14px;
-  border: 1px solid #dbeafe;
-  background: linear-gradient(180deg, #f8fbff 0%, #f1f5ff 100%);
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #1b2531 0%, #161d27 100%);
   box-sizing: border-box;
 }
 
 .booking-cost-summary__row {
   display: flex;
-  flex-direction: column; 
+  flex-direction: column;
   gap: 0.15rem;
   margin-bottom: 0.6rem;
-  color: #334155;
+  color: var(--label);
   font-size: 0.9rem;
 
   @media (min-width: 420px) {
@@ -583,47 +710,48 @@ form { margin-top: 0.5rem; display: grid; gap: 0; }
   }
 
   &:last-child { margin-bottom: 0; }
-  strong { font-weight: 800; color: #0f172a; }
+  strong { font-weight: 800; color: var(--text); }
 }
 
-.booking-cost-summary__divider { border: 0; border-top: 1px dashed #cbd5e1; margin: 0.8rem 0; }
-.booking-cost-summary__row--now { color: var(--primary); strong { color: var(--primary); font-size: 1.1rem; } }
-.booking-cost-summary__row--final { color: #0f766e; strong { color: #0f766e; } }
+.booking-cost-summary__divider { border: 0; border-top: 1px dashed var(--border-strong); margin: 0.8rem 0; }
+.booking-cost-summary__row--now { color: var(--accent-text); strong { color: var(--accent-text); font-size: 1.1rem; } }
+.booking-cost-summary__row--final { color: #34d399; strong { color: #34d399; } }
 
 .checkbox-group { width: 100%; margin-bottom: 1rem; }
 
 .checkbox-item {
   display: flex;
-  align-items: flex-start; 
+  align-items: flex-start;
   gap: 0.6rem;
   margin: 0;
   cursor: pointer;
-  color: #334155;
+  color: var(--text);
 
   input[type='checkbox'] {
     width: 1.2rem;
     height: 1.2rem;
     margin: 0.15rem 0 0;
     flex: 0 0 auto;
+    accent-color: var(--primary);
   }
 
   span {
     font-size: 0.85rem;
-    word-break: break-word; 
+    word-break: break-word;
     line-height: 1.45;
   }
 }
 
 .error-text { display: block; margin-top: 0.4rem; font-size: 0.8rem; font-weight: 600; color: var(--error); line-height: 1.35; }
-.error-text--important { padding: 0.5rem 0.7rem; border-radius: 10px; background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; }
+.error-text--important { padding: 0.5rem 0.7rem; border-radius: 10px; background: rgba(220, 38, 38, 0.14); border: 1px solid rgba(248, 113, 113, 0.4); color: #fca5a5; }
 
 .retry-btn {
   appearance: none;
   display: block;
   margin-top: 0.6rem;
-  border: 1px solid #fda4af;
-  background: #ffffff;
-  color: #9f1239;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: var(--surface-soft);
+  color: #fca5a5;
   border-radius: 10px;
   min-height: 40px;
   padding: 0.5rem 1rem;
@@ -631,7 +759,7 @@ form { margin-top: 0.5rem; display: grid; gap: 0; }
   font-size: 0.85rem;
   cursor: pointer;
 
-  &:hover { background: #fff1f2; }
+  &:hover { background: rgba(220, 38, 38, 0.15); }
 }
 
 button[type='submit'] {
@@ -654,32 +782,36 @@ button[type='submit'] {
     padding: 0.85rem 1.2rem;
   }
 
-  &:disabled { opacity: 0.6; cursor: not-allowed; }
+  &:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 /* Modals design */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(5, 8, 12, 0.72);
   backdrop-filter: blur(3px);
   z-index: 1000;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: clamp(0.5rem, 3vw, 1.5rem); 
+  padding: clamp(0.5rem, 3vw, 1.5rem);
 }
 
 .modal-content {
-  background: white;
+  background: var(--surface);
+  color: var(--text);
   padding: clamp(1.2rem, 5vw, 2rem);
+  border: 1px solid var(--border);
   border-radius: 16px;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-  -webkit-overflow-scrolling: touch; 
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  -webkit-overflow-scrolling: touch;
+
+  a { color: var(--accent-text); }
 }
 
 .modal-close-btn {
@@ -687,9 +819,9 @@ button[type='submit'] {
   display: block;
   width: 100%;
   margin-top: 1.5rem;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #334155;
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  color: var(--text);
   border-radius: 12px;
   padding: 0.85rem 1.2rem;
   font-weight: 700;
@@ -697,7 +829,7 @@ button[type='submit'] {
   cursor: pointer;
   text-align: center;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
 
   @media (min-width: 480px) {
     width: auto;
@@ -708,16 +840,16 @@ button[type='submit'] {
   &:hover {
     background: var(--primary-tint-bg);
     border-color: var(--primary-border);
-    color: var(--primary-strong);
+    color: var(--accent-text);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.14);
+    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.18);
   }
 }
 
 .disabled-checkbox { opacity: 0.6; cursor: not-allowed; }
-.hint-text { display: block; margin-top: 0.3rem; font-size: 0.75rem; font-weight: 500; color: #94a3b8; }
+.hint-text { display: block; margin-top: 0.3rem; font-size: 0.75rem; font-weight: 500; color: var(--muted); }
 .terms-link {
-  color: var(--primary-strong);
+  color: var(--accent-text);
   text-decoration: underline;
   text-decoration-color: rgba(var(--primary-rgb), 0.4);
   text-underline-offset: 2px;

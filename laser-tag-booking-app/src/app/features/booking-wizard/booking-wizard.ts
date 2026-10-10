@@ -221,6 +221,66 @@ export class BookingWizard {
     return 'collapsed';
   }
 
+  // How many days the branded date strip offers before the "Inna data" fallback.
+  readonly dateStripDays = 21;
+
+  // The next bookable days (local ISO yyyy-mm-dd) for the date strip: calendar days
+  // from today forward that pass isOnlineBookingAllowed, capped at dateStripDays and
+  // never scanning past the 6-month maxBookingDate guard. Pure function of "today".
+  get bookableDateStrip(): string[] {
+    const out: string[] = [];
+    const cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    const hardStop = this.sixMonthsFromToday();
+    while (out.length < this.dateStripDays && cursor.getTime() <= hardStop.getTime()) {
+      if (this.isOnlineBookingAllowed(new Date(cursor))) {
+        out.push(this.toLocalIsoDate(cursor));
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return out;
+  }
+
+  // Upper guard for the native "Inna data" fallback picker (~6 months out). There is
+  // no max-advance business rule; this only stops fat-finger far-future dates.
+  get maxBookingDate(): string {
+    return this.toLocalIsoDate(this.sixMonthsFromToday());
+  }
+
+  // True when the chosen date came from the native "Inna data" fallback (i.e. it is
+  // not one of the quick-pick strip days), so that chip can show as active.
+  get isCustomDateSelected(): boolean {
+    return !!this.selectedDateValue && !this.bookableDateStrip.includes(this.selectedDateValue);
+  }
+
+  private readonly polishDowShort = ['Niedz', 'Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob'];
+
+  // Localised day-of-week / day labels for a strip chip, parsed as a local date so the
+  // weekday and day never drift by a timezone offset.
+  dateChipDow(iso: string): string {
+    return this.polishDowShort[new Date(iso + 'T00:00:00').getDay()];
+  }
+
+  dateChipDay(iso: string): string {
+    const d = new Date(iso + 'T00:00:00');
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private sixMonthsFromToday(): Date {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setMonth(d.getMonth() + 6);
+    return d;
+  }
+
+  // Local calendar date as yyyy-mm-dd, without the UTC shift toISOString would apply.
+  private toLocalIsoDate(d: Date): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   get numericPrice(): number {
     return this.selectedPackageDetails?.price ?? 0;
   }

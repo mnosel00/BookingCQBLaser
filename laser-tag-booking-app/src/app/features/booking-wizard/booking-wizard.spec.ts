@@ -216,6 +216,46 @@ describe('BookingWizard', () => {
     });
   });
 
+  describe('bookableDateStrip (branded date-strip options)', () => {
+    it('offers at least one and at most dateStripDays entries', () => {
+      const component = createComponent();
+      expect(component.bookableDateStrip.length).toBeGreaterThan(0);
+      expect(component.bookableDateStrip.length).toBeLessThanOrEqual(component.dateStripDays);
+    });
+
+    it('only includes dates that pass the online-booking lead-time rule', () => {
+      const component = createComponent();
+      for (const iso of component.bookableDateStrip) {
+        expect(component.isOnlineBookingAllowed(new Date(iso))).toBe(true);
+      }
+    });
+
+    it('returns strictly ascending dates, none in the past', () => {
+      const component = createComponent();
+      const strip = component.bookableDateStrip;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (let i = 0; i < strip.length; i++) {
+        expect(new Date(strip[i]).getTime()).toBeGreaterThanOrEqual(today.getTime());
+        if (i > 0) {
+          // ISO yyyy-mm-dd strings sort chronologically as plain strings
+          expect(strip[i] > strip[i - 1]).toBe(true);
+        }
+      }
+    });
+
+    it('exposes a maxBookingDate roughly six months out for the native fallback', () => {
+      const component = createComponent();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays =
+        (new Date(component.maxBookingDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+      expect(diffDays).toBeGreaterThan(150);
+      expect(diffDays).toBeLessThan(200);
+    });
+  });
+
   describe('on a generic booking failure', () => {
     it('shows an inline error message but does not reset the wizard state', () => {
       const component = createComponent();
