@@ -483,9 +483,15 @@ export class BookingWizard {
     });
   }
 
+  // A fresh idempotency key per booking attempt (i.e. per slot selection). It is reused across
+  // retries of the same submission so a double-click or a retry after an uncertain response
+  // resolves to one booking, and regenerated when a new slot is chosen (a new attempt).
+  private currentIdempotencyKey: string | null = null;
+
   selectSlot(slot: TimeSlot): void {
     this.selectedSlot = slot;
     this.submitErrorMessage = null;
+    this.currentIdempotencyKey = crypto.randomUUID();
     this.currentStep = 3;
   }
 
@@ -506,8 +512,9 @@ export class BookingWizard {
       participantsCount: Number(fv.participantsCount),
       package: this.selectedPackage,
       startTime: this.selectedSlot.startTime,
-      isAdultGroup: fv.isAdultGroup, 
-      ageRange: fv.isAdultGroup ? null : fv.ageRange.trim()
+      isAdultGroup: fv.isAdultGroup,
+      ageRange: fv.isAdultGroup ? null : fv.ageRange.trim(),
+      idempotencyKey: (this.currentIdempotencyKey ??= crypto.randomUUID())
     };
 
     this.isSubmitting = true;

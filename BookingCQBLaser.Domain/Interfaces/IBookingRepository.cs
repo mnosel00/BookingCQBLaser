@@ -10,6 +10,7 @@ namespace BookingCQBLaser.Domain.Interfaces
     public interface IBookingRepository
     {
         Task<Booking?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+        Task<Booking?> GetByIdempotencyKeyAsync(Guid idempotencyKey, CancellationToken cancellationToken = default);
         Task<IEnumerable<Booking>> GetByDateRangeAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken cancellationToken = default);
         Task AddAsync(Booking booking, CancellationToken cancellationToken = default);
         Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default);

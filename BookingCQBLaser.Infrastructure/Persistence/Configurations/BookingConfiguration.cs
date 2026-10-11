@@ -11,6 +11,10 @@ namespace BookingCQBLaser.Infrastructure.Persistence.Configurations
 {
     public class BookingConfiguration : IEntityTypeConfiguration<Booking>
     {
+        // Single source of truth for the idempotency unique-index name: the repository keys off
+        // it to recognise a duplicate-submission violation, so both must agree.
+        public const string IdempotencyKeyIndexName = "IX_Bookings_IdempotencyKey";
+
         public void Configure(EntityTypeBuilder<Booking> builder)
         {
             builder.ToTable("Bookings");
@@ -55,6 +59,16 @@ namespace BookingCQBLaser.Infrastructure.Persistence.Configurations
                 .IsRequired(false)
                 .HasMaxLength(50)
                 .HasColumnName("AgeRange");
+
+            builder.Property(b => b.IdempotencyKey)
+                .IsRequired(false);
+
+            // Makes CreateBooking idempotent at the database level: a second insert with the same
+            // key is rejected. Postgres treats NULLs as distinct, so bookings without a key are
+            // unaffected. The repository keys off this index name to resolve the duplicate.
+            builder.HasIndex(b => b.IdempotencyKey)
+                .IsUnique()
+                .HasDatabaseName("IX_Bookings_IdempotencyKey");
 
             // GetByDateRangeAsync filters on StartTime + PaymentStatus for every availability
             // check; the cleanup job filters on PaymentStatus + CreatedAt every 5 minutes.

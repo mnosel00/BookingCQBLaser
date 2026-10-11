@@ -42,6 +42,9 @@ namespace BookingCQBLaser.Infrastructure.Migrations
                     b.Property<string>("GoogleCalendarEventId")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("IdempotencyKey")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsAdultGroup")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -62,6 +65,10 @@ namespace BookingCQBLaser.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Bookings_IdempotencyKey");
 
                     b.HasIndex("PaymentStatus", "CreatedAt")
                         .HasDatabaseName("IX_Bookings_PaymentStatus_CreatedAt");
