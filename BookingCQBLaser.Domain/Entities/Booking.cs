@@ -22,6 +22,11 @@ namespace BookingCQBLaser.Domain.Entities
         public bool IsAdultGroup { get; private set; }
         public string? AgeRange { get; private set; }
 
+        // Client-supplied key that makes CreateBooking idempotent: a retried or double-clicked
+        // submission with the same key resolves to this one booking instead of creating another.
+        // Nullable for bookings created before this existed and for any path that omits it.
+        public Guid? IdempotencyKey { get; private set; }
+
 
 
         // Constructor for ORM usage
@@ -34,10 +39,12 @@ namespace BookingCQBLaser.Domain.Entities
             DateTimeOffset startTime,
             int totalBlockedDurationMinutes,
             bool isAdultGroup,
-            string? ageRange)
+            string? ageRange,
+            Guid? idempotencyKey = null)
         {
             Id = Guid.NewGuid();
             CreatedAt = DateTimeOffset.UtcNow;
+            IdempotencyKey = idempotencyKey;
 
             Customer = customer ?? throw new ArgumentNullException(nameof(customer));
 

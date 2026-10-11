@@ -155,6 +155,51 @@ describe('BookingWizard', () => {
     });
   });
 
+  describe('idempotency key', () => {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    function armSubmit(component: BookingWizard) {
+      component.hasOpenedTerms = true;
+      component.selectedPackage = PackageType.S1;
+      component.customerForm.setValue(VALID_FORM_VALUE);
+      apiSpy.createBooking.mockReturnValue(of({ bookingId: 'id', paymentUrl: 'https://pay/x' }));
+    }
+
+    it('sends a UUID idempotency key that is reused across retries of the same attempt', () => {
+      const component = createComponent();
+      armSubmit(component);
+      component.selectSlot(slot('2026-09-01T09:00:00+02:00', 90)); // one attempt → one key
+
+      const original = window.location;
+      Object.defineProperty(window, 'location', { value: { href: '' }, writable: true });
+      component.submitBooking();
+      component.submitBooking(); // retry of the same attempt
+      Object.defineProperty(window, 'location', { value: original, writable: true });
+
+      const first = apiSpy.createBooking.mock.calls[0][0].idempotencyKey;
+      const second = apiSpy.createBooking.mock.calls[1][0].idempotencyKey;
+      expect(first).toMatch(UUID);
+      expect(second).toBe(first);
+    });
+
+    it('regenerates the key when a new slot is selected (a fresh attempt)', () => {
+      const component = createComponent();
+      armSubmit(component);
+
+      const original = window.location;
+      Object.defineProperty(window, 'location', { value: { href: '' }, writable: true });
+      component.selectSlot(slot('2026-09-01T09:00:00+02:00', 90));
+      component.submitBooking();
+      component.selectSlot(slot('2026-09-01T14:00:00+02:00', 90)); // new attempt
+      component.submitBooking();
+      Object.defineProperty(window, 'location', { value: original, writable: true });
+
+      const first = apiSpy.createBooking.mock.calls[0][0].idempotencyKey;
+      const second = apiSpy.createBooking.mock.calls[1][0].idempotencyKey;
+      expect(second).not.toBe(first);
+    });
+  });
+
   describe('when the slot was taken by someone else (409)', () => {
     it('clears the stale selection, returns to step 2, reloads slots, and shows an inline error', () => {
       const component = createComponent();

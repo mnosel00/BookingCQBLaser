@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Enums;
+using BookingCQBLaser.Domain.Exceptions;
 using BookingCQBLaser.Domain.ValueObject;
 using BookingCQBLaser.Infrastructure.Persistence.Configurations;
 using BookingCQBLaser.Infrastructure.Persistence.Repositories;
@@ -40,7 +41,7 @@ public class BookingRepositoryTests
             .UseNpgsql("Host=localhost;Database=unit_test;Username=u;Password=p")
             .Options;
 
-    private static Booking ValidBooking() =>
+    private static Booking ValidBooking(Guid? idempotencyKey = null) =>
         new(
             new CustomerInfo("Jan", "Kowalski", "jan@example.com", "123456789"),
             participantsCount: 10,
@@ -48,12 +49,13 @@ public class BookingRepositoryTests
             startTime: new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero),
             totalBlockedDurationMinutes: 90,
             isAdultGroup: true,
-            ageRange: null);
+            ageRange: null,
+            idempotencyKey: idempotencyKey);
 
-    private static DbUpdateException DbUpdateWith(string sqlState) =>
+    private static DbUpdateException DbUpdateWith(string sqlState, string? constraintName = null) =>
         new(
             "update failed",
-            new PostgresException("conflict", "ERROR", "ERROR", sqlState));
+            new PostgresException("conflict", "ERROR", "ERROR", sqlState, constraintName: constraintName));
 
     [Fact]
     public async Task AddAsync_translates_a_Postgres_exclusion_violation_into_InvalidOperationException()
@@ -70,16 +72,32 @@ public class BookingRepositoryTests
     }
 
     [Fact]
-    public async Task AddAsync_does_not_translate_an_unrelated_DbUpdateException()
+    public async Task AddAsync_translates_an_idempotency_unique_violation_into_DuplicateBookingSubmissionException()
     {
-        // A different failure (e.g. a unique-violation, not the overlap constraint) must not be
-        // disguised as a slot conflict; it propagates unchanged.
-        var other = DbUpdateWith(PostgresErrorCodes.UniqueViolation); // 23505
+        var key = Guid.NewGuid();
+        // A unique violation on the idempotency index = the same submission arrived twice.
+        var duplicate = DbUpdateWith(PostgresErrorCodes.UniqueViolation, BookingConfiguration.IdempotencyKeyIndexName);
+        await using var context = new ThrowingDbContext(BuildOptions(), duplicate);
+        var repository = new BookingRepository(context);
+
+        var ex = await Assert.ThrowsAsync<DuplicateBookingSubmissionException>(
+            () => repository.AddAsync(ValidBooking(key)));
+
+        Assert.Equal(key, ex.IdempotencyKey);
+        Assert.Same(duplicate, ex.InnerException);
+    }
+
+    [Fact]
+    public async Task AddAsync_does_not_translate_an_unrelated_unique_violation()
+    {
+        // A unique violation on some other constraint must not be disguised as a slot conflict or
+        // a duplicate submission; it propagates unchanged.
+        var other = DbUpdateWith(PostgresErrorCodes.UniqueViolation, "IX_Bookings_SomethingElse");
         await using var context = new ThrowingDbContext(BuildOptions(), other);
         var repository = new BookingRepository(context);
 
         var ex = await Assert.ThrowsAsync<DbUpdateException>(
-            () => repository.AddAsync(ValidBooking()));
+            () => repository.AddAsync(ValidBooking(Guid.NewGuid())));
 
         Assert.Same(other, ex);
     }

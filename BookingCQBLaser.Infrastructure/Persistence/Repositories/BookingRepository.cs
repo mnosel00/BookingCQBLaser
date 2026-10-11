@@ -1,6 +1,8 @@
 ﻿using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Enums;
+using BookingCQBLaser.Domain.Exceptions;
 using BookingCQBLaser.Domain.Interfaces;
+using BookingCQBLaser.Infrastructure.Persistence.Configurations;
 using BookingCQBLaser.Infrastructure.Persistence.Configurations;
 using System;
 using System.Collections.Generic;
@@ -25,6 +27,12 @@ namespace BookingCQBLaser.Infrastructure.Persistence.Repositories
         {
             return await _dbContext.Bookings
                 .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
+        }
+
+        public async Task<Booking?> GetByIdempotencyKeyAsync(Guid idempotencyKey, CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.Bookings
+                .FirstOrDefaultAsync(b => b.IdempotencyKey == idempotencyKey, cancellationToken);
         }
 
         public async Task<IEnumerable<Booking>> GetByDateRangeAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken cancellationToken = default)
@@ -53,12 +61,26 @@ namespace BookingCQBLaser.Infrastructure.Persistence.Repositories
                 throw new InvalidOperationException(
                     "The requested time slot overlaps with an existing booking.", ex);
             }
+            catch (DbUpdateException ex) when (IsIdempotencyViolation(ex))
+            {
+                // Same submission arrived twice (double-click / retry that raced the original).
+                // The unique index rejected the duplicate; the caller resolves it to the booking
+                // that won by re-reading it by key.
+                throw new DuplicateBookingSubmissionException(booking.IdempotencyKey!.Value, ex);
+            }
         }
 
         private static bool IsOverlapViolation(DbUpdateException ex)
         {
             return ex.InnerException is PostgresException pg
                 && pg.SqlState == PostgresErrorCodes.ExclusionViolation;
+        }
+
+        private static bool IsIdempotencyViolation(DbUpdateException ex)
+        {
+            return ex.InnerException is PostgresException pg
+                && pg.SqlState == PostgresErrorCodes.UniqueViolation
+                && pg.ConstraintName == BookingConfiguration.IdempotencyKeyIndexName;
         }
 
         public async Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default)

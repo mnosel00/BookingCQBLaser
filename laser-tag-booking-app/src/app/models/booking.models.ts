@@ -23,8 +23,10 @@ export interface CreateBookingRequest {
   participantsCount: number;
   package: PackageType;
   startTime: string;
-  isAdultGroup: boolean; 
+  isAdultGroup: boolean;
   ageRange: string | null;
+  // Stable per booking attempt so a retry/double-submit can't create a second booking.
+  idempotencyKey: string;
 }
 
 export interface CreateBookingResponse {

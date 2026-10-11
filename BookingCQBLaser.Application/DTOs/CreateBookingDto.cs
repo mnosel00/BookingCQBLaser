@@ -16,5 +16,6 @@ namespace BookingCQBLaser.Application.DTOs
     PackageType Package,
     DateTimeOffset StartTime,
     bool IsAdultGroup,
-    string? AgeRange);
+    string? AgeRange,
+    Guid? IdempotencyKey = null);
 }

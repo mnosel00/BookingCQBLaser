@@ -2,6 +2,7 @@
 using BookingCQBLaser.Application.DTOs;
 using BookingCQBLaser.Domain.Entities;
 using BookingCQBLaser.Domain.Enums;
+using BookingCQBLaser.Domain.Exceptions;
 using BookingCQBLaser.Domain.Interfaces;
 using BookingCQBLaser.Domain.ValueObject;
 using Microsoft.Extensions.Logging;
@@ -54,6 +55,20 @@ public class BookingService : IBookingService
        CreateBookingDto dto,
        CancellationToken cancellationToken = default)
     {
+        // Idempotency: a retried or double-clicked submission carrying the same key resolves to
+        // the booking already created, instead of making a second one or re-running availability.
+        if (dto.IdempotencyKey is Guid key)
+        {
+            var existingByKey = await _repository.GetByIdempotencyKeyAsync(key, cancellationToken);
+            if (existingByKey is not null)
+            {
+                _logger.LogInformation(
+                    "Idempotent replay of CreateBooking for key {IdempotencyKey}; returning existing booking {BookingId}.",
+                    key, existingByKey.Id);
+                return BuildBookingResponse(existingByKey);
+            }
+        }
+
         if (!_availabilityCalculator.IsOnlineBookingAllowed(dto.StartTime))
         {
             throw new InvalidOperationException("Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199");
@@ -86,19 +101,38 @@ public class BookingService : IBookingService
             dto.StartTime.ToUniversalTime(),
             totalBlockedDurationMinutes,
             dto.IsAdultGroup,
-            dto.AgeRange);
+            dto.AgeRange,
+            dto.IdempotencyKey);
 
-        await _repository.AddAsync(booking, cancellationToken);
+        try
+        {
+            await _repository.AddAsync(booking, cancellationToken);
+        }
+        catch (DuplicateBookingSubmissionException ex)
+        {
+            // The same submission raced us and won; return that booking rather than erroring.
+            var winner = await _repository.GetByIdempotencyKeyAsync(ex.IdempotencyKey, cancellationToken);
+            if (winner is not null)
+            {
+                _logger.LogInformation(
+                    "Concurrent duplicate submission for key {IdempotencyKey}; returning booking {BookingId}.",
+                    ex.IdempotencyKey, winner.Id);
+                return BuildBookingResponse(winner);
+            }
+            throw;
+        }
+
         _logger.LogInformation(
             "Booking {BookingId} saved to database as Pending. IsAdultGroup={IsAdultGroup}, AgeRange={AgeRange}",
             booking.Id,
             booking.IsAdultGroup,
             booking.AgeRange);
 
-        string paymentUrl = _hotpayService.GeneratePaymentUrl(booking, OnlineChargeAmount);
-
-        return new CreateBookingResponseDto(booking.Id, paymentUrl);
+        return BuildBookingResponse(booking);
     }
+
+    private CreateBookingResponseDto BuildBookingResponse(Booking booking) =>
+        new(booking.Id, _hotpayService.GeneratePaymentUrl(booking, OnlineChargeAmount));
 
     public async Task<BookingStatusDto> GetBookingStatusAsync(Guid bookingId, CancellationToken cancellationToken = default)
     {
