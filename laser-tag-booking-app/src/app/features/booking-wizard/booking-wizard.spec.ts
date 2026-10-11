@@ -61,17 +61,27 @@ describe('BookingWizard', () => {
     expect(createComponent()).toBeTruthy();
   });
 
-  it('defaults participantsCount to the package minimum on selection (10 for S1/U1, 8 for others)', () => {
+  it('clears participantsCount on selection so the customer enters it (no pre-filled default)', () => {
     const component = createComponent();
 
+    component.customerForm.get('participantsCount')?.setValue(12);
     component.selectPackage(PackageType.S1);
-    expect(component.customerForm.get('participantsCount')?.value).toBe(10);
+    expect(component.customerForm.get('participantsCount')?.value).toBeNull();
+  });
+
+  it('sets the minimum-participants validator from the selected package (10 for S1/U1, 8 for others)', () => {
+    const component = createComponent();
+    const ctrl = component.customerForm.get('participantsCount')!;
+
+    component.selectPackage(PackageType.S1);
+    ctrl.setValue(9);
+    expect(ctrl.hasError('min')).toBe(true); // S1 requires 10
+    expect(component.minParticipants).toBe(10);
 
     component.selectPackage(PackageType.S2);
-    expect(component.customerForm.get('participantsCount')?.value).toBe(8);
-
-    component.selectPackage(PackageType.U1);
-    expect(component.customerForm.get('participantsCount')?.value).toBe(10);
+    ctrl.setValue(8);
+    expect(ctrl.hasError('min')).toBe(false); // S2 allows 8
+    expect(component.minParticipants).toBe(8);
   });
 
   it('splits slots into compatible/incompatible using durations fetched from the API', () => {
@@ -208,18 +218,25 @@ describe('BookingWizard', () => {
       expect(component.summaryBarMode).toBe('full');
     });
 
-    it('is collapsed on step 3', () => {
+    it('is full on step 3 too (footer is consistent across steps 2 and 3)', () => {
       const component = createComponent();
       component.selectPackage(PackageType.S1);
       component.currentStep = 3;
-      expect(component.summaryBarMode).toBe('collapsed');
+      expect(component.summaryBarMode).toBe('full');
     });
   });
 
   describe('Total Price (the SUMA shown on step 2 once participants are chosen)', () => {
+    it('is zero until the customer enters a participant count', () => {
+      const component = createComponent();
+      component.selectPackage(PackageType.S2); // field starts empty (no pre-filled default)
+      expect(component.totalCost).toBe(0);
+    });
+
     it('is the package per-person price multiplied by the chosen participant count', () => {
       const component = createComponent();
-      component.selectPackage(PackageType.S2); // 65 PLN/os, defaults to the minimum (8)
+      component.selectPackage(PackageType.S2); // 65 PLN/os
+      component.customerForm.get('participantsCount')?.setValue(8);
       expect(component.totalCost).toBe(65 * 8);
 
       component.customerForm.get('participantsCount')?.setValue(12);

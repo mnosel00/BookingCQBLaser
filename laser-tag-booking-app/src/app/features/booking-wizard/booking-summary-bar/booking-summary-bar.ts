@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core';
 
-export type SummaryBarMode = 'hidden' | 'full' | 'collapsed';
+export type SummaryBarMode = 'hidden' | 'full';
 
 /**
  * Presentational "booking so far" bar. Holds no logic and does no pricing
@@ -8,11 +8,8 @@ export type SummaryBarMode = 'hidden' | 'full' | 'collapsed';
  * tested `summaryBarMode` decision. Uses the glossary terms Package / Total Price
  * / Deposit.
  *
- * - `full`      → Package + Total Price + Deposit (step 2).
- * - `collapsed` → Package name only (step 3, where the detailed cost receipt owns
- *                 the numbers).
- *
- * The parent only renders this component when the mode is not `hidden`.
+ * Shows Package + Total Price + Deposit. The parent only renders it when the mode
+ * is `full` (i.e. not `hidden`), so the footer reads the same on steps 2 and 3.
  */
 @Component({
   selector: 'app-booking-summary-bar',
@@ -21,7 +18,6 @@ export type SummaryBarMode = 'hidden' | 'full' | 'collapsed';
   styleUrl: './booking-summary-bar.scss'
 })
 export class BookingSummaryBar {
-  @Input() mode: Exclude<SummaryBarMode, 'hidden'> = 'full';
   @Input() packageName = '';
   @Input() totalPrice = 0;
   @Input() depositAmount = 0;

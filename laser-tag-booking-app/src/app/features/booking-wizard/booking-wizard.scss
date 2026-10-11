@@ -680,6 +680,36 @@ input[type='date'] {
   background: var(--surface-soft);
 }
 
+/* Step 2 fallback: call-us prompt when no suitable date/time is found */
+.call-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 1.5rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--primary-border);
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+
+  a {
+    color: var(--accent-text);
+    font-weight: 800;
+    white-space: nowrap;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+.call-banner__icon {
+  flex: 0 0 auto;
+  font-size: 1.1rem;
+  line-height: 1.35;
+}
+
 /* Step 3 Form elements */
 form { margin-top: 0.5rem; display: grid; gap: 0; }
 .form-field { width: 100%; margin-bottom: 1.25rem; display: flex; flex-direction: column; min-width: 0; }

@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import {
   FormBuilder,
+  FormControl,
   ReactiveFormsModule,
   Validators
 } from '@angular/forms';
@@ -59,6 +60,11 @@ export class BookingWizard {
   private packageBlockMinutes: Partial<Record<PackageType, number>> = {};
 
   readonly minDateValue: string = this.toLocalIsoDate(new Date());
+
+  // Venue booking phone, in one place: shown in the step-2 call banner and the
+  // over-26 group message. `venuePhoneTel` is the dialable tel: href form.
+  readonly venuePhone = '+48 509 595 199';
+  readonly venuePhoneTel = 'tel:+48509595199';
 
   readonly packagesList: PackageDetails[] = [
     {
@@ -134,7 +140,9 @@ export class BookingWizard {
     lastName: ['', [Validators.required, Validators.pattern(NAME_PATTERN)]],
     email: ['', [Validators.required, Validators.email]],
     phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN)]],
-    participantsCount: [1, [Validators.required, Validators.min(8), Validators.max(26)]],
+    // Nullable so it can start empty (showing the placeholder); the customer must
+    // enter the count — there is no pre-filled default. `required` gates submission.
+    participantsCount: new FormControl<number | null>(null, [Validators.required, Validators.min(8), Validators.max(26)]),
     acceptTerms: [false, Validators.requiredTrue],
     acceptLegal: [false, Validators.requiredTrue],
     isAdultGroup: [false], 
@@ -210,15 +218,14 @@ export class BookingWizard {
     return (this.currentStep / 3) * 100;
   }
 
-  // Drives the sticky summary bar's per-step content. Pure function of currentStep +
-  // whether a Package is selected; the bar component itself holds no such logic.
-  //   step 1 / no Package → hidden   (uncluttered Package comparison)
-  //   step 2              → full      (Package + Total Price + Deposit)
-  //   step 3              → collapsed (Package name only; the cost receipt owns the numbers)
+  // Drives the sticky summary bar's visibility. Pure function of currentStep + whether
+  // a Package is selected. The bar shows the same full content (Package + Total Price +
+  // Deposit) on steps 2 and 3 so the footer is consistent across the flow.
+  //   step 1 / no Package → hidden (uncluttered Package comparison)
+  //   steps 2 & 3         → full
   get summaryBarMode(): SummaryBarMode {
     if (this.selectedPackage === null || this.currentStep === 1) return 'hidden';
-    if (this.currentStep === 2) return 'full';
-    return 'collapsed';
+    return 'full';
   }
 
   // How many days the branded date strip offers before the "Inna data" fallback.
@@ -266,6 +273,19 @@ export class BookingWizard {
   dateChipDay(iso: string): string {
     const d = new Date(iso + 'T00:00:00');
     return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  // On desktop, clicking a date input's field does not open the calendar (only the
+  // small indicator does), so the invisible overlay chip appeared dead. showPicker()
+  // opens it from the click gesture; on mobile tapping already opened it.
+  openNativeDatePicker(event: Event): void {
+    const input = event.target as HTMLInputElement & { showPicker?: () => void };
+    try {
+      input.showPicker?.();
+    } catch {
+      // showPicker can throw (unsupported, or not a user gesture); the native field
+      // still works on platforms where tapping it opens the picker directly.
+    }
   }
 
   private sixMonthsFromToday(): Date {
@@ -399,9 +419,10 @@ export class BookingWizard {
       Validators.min(minPersons),
       Validators.max(26)
     ]);
-    // Start the field at the package's minimum instead of leaving it at 1 (or
-    // a leftover value from a previously selected package).
-    participantsCtrl.setValue(minPersons);
+    // Clear the field so the customer enters the count themselves (the placeholder
+    // prompts them); don't pre-fill a number. Also drops any leftover value from a
+    // previously selected package, whose minimum may differ.
+    participantsCtrl.setValue(null);
     participantsCtrl.updateValueAndValidity();
 
     this.currentStep = 2;

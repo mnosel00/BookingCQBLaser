@@ -15,7 +15,6 @@
 
   @if (summaryBarMode !== 'hidden') {
     <app-booking-summary-bar
-      [mode]="summaryBarMode"
       [packageName]="selectedPackageDetails?.name ?? ''"
       [totalPrice]="totalCost"
       [depositAmount]="depositAmount"
@@ -95,13 +94,13 @@
          Total Price reflects the real, chosen number of Participants rather than a default guess. -->
     <div class="form-field" [formGroup]="customerForm">
       <label for="participantsCount">Liczba uczestników</label>
-      <input id="participantsCount" type="number" [attr.min]="minParticipants" max="26" formControlName="participantsCount" />
+      <input id="participantsCount" type="number" [attr.min]="minParticipants" max="26" placeholder="Podaj liczbę uczestników" formControlName="participantsCount" />
       <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('required')">Liczba uczestników jest wymagana.</small>
       <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('min')">
         Minimalna liczba uczestników dla tego pakietu wynosi {{ f('participantsCount')?.getError('min')?.min }}.
       </small>
       <small class="error-text error-text--important" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('max')">
-        W celu rezerwacji dla grupy powyżej 26 osób prosimy o dokonywanie rezerwacji telefonicznie pod numerem +48 509 595 199.
+        W celu rezerwacji dla grupy powyżej 26 osób prosimy o dokonywanie rezerwacji telefonicznie pod numerem {{ venuePhone }}.
       </small>
     </div>
 
@@ -130,6 +129,7 @@
             [min]="minDateValue"
             [max]="maxBookingDate"
             [value]="selectedDateValue"
+            (click)="openNativeDatePicker($event)"
             (change)="onDateChange(($any($event.target)).value)"
           />
         </label>
@@ -183,6 +183,14 @@
         </ng-container>
       </ng-container>
     </ng-container>
+
+    <p class="call-banner">
+      <span class="call-banner__icon" aria-hidden="true">📞</span>
+      <span>
+        Nie możesz znaleźć pasującego terminu lub godziny? Zadzwoń do nas, a pomożemy
+        zarezerwować Twój termin: <a [href]="venuePhoneTel">{{ venuePhone }}</a>
+      </span>
+    </p>
   </section>
 
   <section *ngIf="currentStep === 3" aria-labelledby="step-3-title">

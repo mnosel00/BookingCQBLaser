@@ -4,14 +4,12 @@
     <span class="summary-bar__value">{{ packageName }}</span>
   </div>
 
-  @if (mode === 'full') {
-    <div class="summary-bar__item">
-      <span class="summary-bar__label">Suma</span>
-      <span class="summary-bar__value summary-bar__value--total">{{ totalPrice }} PLN</span>
-    </div>
-    <div class="summary-bar__item">
-      <span class="summary-bar__label">Zadatek teraz</span>
-      <span class="summary-bar__value">{{ depositAmount }} PLN</span>
-    </div>
-  }
+  <div class="summary-bar__item">
+    <span class="summary-bar__label">Suma</span>
+    <span class="summary-bar__value summary-bar__value--total">{{ totalPrice }} PLN</span>
+  </div>
+  <div class="summary-bar__item">
+    <span class="summary-bar__label">Zadatek teraz</span>
+    <span class="summary-bar__value">{{ depositAmount }} PLN</span>
+  </div>
 </aside>
