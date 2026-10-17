@@ -30,7 +30,7 @@
   </p>
 
   <section *ngIf="currentStep === 1" aria-labelledby="step-1-title">
-    <h2 id="step-1-title" style="margin-bottom: 1rem;">Wybierz pakiet</h2>
+    <h2 id="step-1-title" tabindex="-1" style="margin-bottom: 1rem;">Wybierz pakiet</h2>
 
     <div class="category-toggle" role="tablist" aria-label="Package category">
       <button type="button" role="tab" class="category-toggle__btn"
@@ -82,7 +82,7 @@
   <section *ngIf="currentStep === 2" aria-labelledby="step-2-title">
     <div class="step-nav">
       <button type="button" class="btn-back" (click)="previousStep()">Wróć</button>
-      <h2 id="step-2-title">Wybierz termin</h2>
+      <h2 id="step-2-title" tabindex="-1">Wybierz termin</h2>
     </div>
 
     <div class="selected-package-summary" *ngIf="selectedPackageDetails">
@@ -141,6 +141,10 @@
         </label>
       </div>
     </div>
+
+    <!-- Announces the slot-loading result to screen readers (visually hidden). Always present
+         while on step 2 so aria-live reliably fires when the message changes. -->
+    <p class="sr-only" role="status" aria-live="polite">{{ slotsAnnouncement }}</p>
 
     <div *ngIf="showPhoneContactWarning" class="error-text error-text--important" role="alert" style="margin-top: 1rem;">
       Rezerwacja online w tym dniu jest wyłączona, prosimy o kontakt telefoniczny lub SMS: 509 595 199
@@ -203,7 +207,7 @@
   <section *ngIf="currentStep === 3" aria-labelledby="step-3-title">
     <div class="step-nav">
       <button type="button" class="btn-back" (click)="previousStep()">Wróć</button>
-      <h2 id="step-3-title">Dane rezerwacji</h2>
+      <h2 id="step-3-title" tabindex="-1">Dane rezerwacji</h2>
     </div>
 
     <div class="selected-package-summary" *ngIf="selectedPackageDetails">
