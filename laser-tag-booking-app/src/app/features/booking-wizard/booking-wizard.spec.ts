@@ -246,6 +246,30 @@ describe('BookingWizard', () => {
     });
   });
 
+  describe('participant-count gate (step 2 -> 3)', () => {
+    it('does not advance to step 3 when the participant count is missing', () => {
+      const component = createComponent();
+      component.selectPackage(PackageType.S1); // step 2, participant count cleared to null
+
+      component.selectSlot(slot('2026-09-01T09:00:00+02:00', 90));
+
+      expect(component.currentStep).toBe(2);
+      expect(component.selectedSlot).toBeNull();
+      expect(component.customerForm.get('participantsCount')?.touched).toBe(true);
+    });
+
+    it('advances to step 3 once a valid participant count is entered', () => {
+      const component = createComponent();
+      component.selectPackage(PackageType.S1);
+      component.customerForm.get('participantsCount')?.setValue(10);
+
+      component.selectSlot(slot('2026-09-01T09:00:00+02:00', 90));
+
+      expect(component.currentStep).toBe(3);
+      expect(component.selectedSlot).not.toBeNull();
+    });
+  });
+
   describe('summaryBarMode', () => {
     it('is hidden on step 1 (package comparison, no bar)', () => {
       const component = createComponent();

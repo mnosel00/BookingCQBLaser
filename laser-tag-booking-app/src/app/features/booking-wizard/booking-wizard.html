@@ -98,7 +98,7 @@
         formControlName="participantsCount"
         aria-describedby="participantsCount-hint participantsCount-error"
         [attr.aria-invalid]="f('participantsCount')?.touched && f('participantsCount')?.invalid ? 'true' : null" />
-      <small id="participantsCount-hint" class="hint-text">Od {{ minParticipants }} do 26 osób.</small>
+      <small id="participantsCount-hint" class="hint-text">minimum {{ minParticipants }}</small>
       <div id="participantsCount-error" class="field-error" aria-live="polite">
         <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('required')">Liczba uczestników jest wymagana.</small>
         <small class="error-text" *ngIf="f('participantsCount')?.touched && f('participantsCount')?.hasError('min')">
@@ -198,8 +198,8 @@
     <p class="call-banner">
       <span class="call-banner__icon" aria-hidden="true">📞</span>
       <span>
-        Nie możesz znaleźć pasującego terminu lub godziny? Zadzwoń do nas, a pomożemy
-        zarezerwować Twój termin: <a [href]="venuePhoneTel">{{ venuePhone }}</a>
+        Nie widzisz swojego terminu lub godziny? Zadzwoń do nas, a pomożemy ci
+        z rezerwacją: <a [href]="venuePhoneTel">{{ venuePhone }}</a>
       </span>
     </p>
   </section>
