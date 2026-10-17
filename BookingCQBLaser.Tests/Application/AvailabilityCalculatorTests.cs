@@ -67,59 +67,73 @@ public class AvailabilityCalculatorTests
     }
 
     [Fact]
-    public async Task GetAvailableTimeSlotsAsync_EmptyDay_OffersEveryIntervalAlignedStart()
+    public async Task GetAvailableTimeSlotsAsync_EmptyDay_OffersEveryGapFreeStartAndSkipsOrphaningOnes()
     {
-        // Tuesday, arena hours 09:00-23:00 (14h), S2 needs 90 blocked minutes.
+        // Tuesday, arena 09:00-23:00 (840 min), S2 blocks 90 min. On the 30-min grid that is 26
+        // candidate starts, but the packer drops the 6 whose leftover would strand arena time it
+        // can never fill (a 30/60/150-min gap): 09:30, 10:00, 11:30, 19:00, 20:30, 21:00.
         var calculator = CreateCalculator();
         var date = PolandTime(2026, 9, 1, 12, 0);
 
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        // 09:00 to 21:30 inclusive, every 30 minutes = 26 candidate starts.
-        Assert.Equal(26, slots.Count);
+        Assert.Equal(20, slots.Count);
         Assert.Equal(PolandTime(2026, 9, 1, 9, 0), slots.First().StartTime);
         Assert.Equal(PolandTime(2026, 9, 1, 21, 30), slots.Last().StartTime);
         Assert.Equal(840, slots.First().MaxAvailableDurationMinutes); // full day still open
         Assert.Equal(90, slots.Last().MaxAvailableDurationMinutes); // exactly the package's duration
+
+        // Gap-free interior starts are offered...
+        Assert.Contains(PolandTime(2026, 9, 1, 10, 30), starts);
+        // ...but starts whose leftover is an unfillable 30 / 60 / 150-min gap are not.
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 9, 30), starts);  // 30-min gap before
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 10, 0), starts);  // 60-min gap before
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 11, 30), starts); // 150-min gap before
     }
 
     [Fact]
-    public async Task GetAvailableTimeSlotsAsync_OneExistingLocalBooking_OnlyOffersFlushEdgeSlots()
+    public async Task GetAvailableTimeSlotsAsync_OneExistingBooking_OffersInteriorTileableStartsNotJustEdges()
     {
-        // Existing booking 14:00-15:30 splits the day into two free windows.
+        // Existing booking 14:00-15:30 splits the day into [09:00,14:00) = 300 min and
+        // [15:30,23:00) = 450 min. S2 blocks 90. The packer offers every gap-free start in each
+        // window - including interior ones that tile cleanly, not only the flush edges.
         SetLocalBookings(LocalBooking(PolandTime(2026, 9, 1, 14, 0), 90));
         var calculator = CreateCalculator();
         var date = PolandTime(2026, 9, 1, 12, 0);
 
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
-
-        // Before-window [09:00,14:00): flush-start (09:00) + flush-end (12:30).
-        // After-window [15:30,23:00): flush-start (15:30) + flush-end (21:30).
-        Assert.Equal(4, slots.Count);
         var starts = slots.Select(s => s.StartTime).ToHashSet();
-        Assert.Contains(PolandTime(2026, 9, 1, 9, 0), starts);
-        Assert.Contains(PolandTime(2026, 9, 1, 12, 30), starts);
+
+        Assert.Equal(11, slots.Count);
+        // First window: flush edges plus tileable interiors.
+        Assert.Contains(PolandTime(2026, 9, 1, 9, 0), starts);   // flush start
+        Assert.Contains(PolandTime(2026, 9, 1, 10, 30), starts); // interior: 90|90|120
+        Assert.Contains(PolandTime(2026, 9, 1, 11, 0), starts);  // interior: 120|90|90
+        Assert.Contains(PolandTime(2026, 9, 1, 12, 30), starts); // flush end
+        // Second window edges.
         Assert.Contains(PolandTime(2026, 9, 1, 15, 30), starts);
         Assert.Contains(PolandTime(2026, 9, 1, 21, 30), starts);
-
-        // Nothing floats in between - no slot starts strictly inside a window without touching an edge.
-        Assert.DoesNotContain(slots, s => s.StartTime == PolandTime(2026, 9, 1, 10, 30));
+        // Orphaning starts are still excluded.
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 9, 30), starts);
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 10, 0), starts);
     }
 
     [Fact]
-    public async Task GetAvailableTimeSlotsAsync_GoogleCalendarBlock_TriggersEdgeModeJustLikeALocalBooking()
+    public async Task GetAvailableTimeSlotsAsync_AwkwardGapThatCannotTile_StillOffersLeastWastefulSlots()
     {
-        // No local booking, but a Google Calendar block occupies 12:00-13:00 - this alone must
-        // switch the day out of free-choice mode.
-        SetGoogleBusyPeriods((PolandTime(2026, 9, 1, 12, 0), PolandTime(2026, 9, 1, 13, 0)));
+        // A booking 11:30-23:00 leaves a lone 150-minute morning window [09:00,11:30). 150 can't be
+        // tiled exactly by 90/120, so some arena time is unavoidably stranded - but the packer must
+        // still offer bookable slots (the least-wasteful placements), not refuse the window outright.
+        SetLocalBookings(LocalBooking(PolandTime(2026, 9, 1, 11, 30), 690));
         var calculator = CreateCalculator();
         var date = PolandTime(2026, 9, 1, 8, 0);
 
-        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S1)).ToList();
+        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
 
-        // If this were still free-choice (dense) mode, a 14-hour day minus a 1-hour block would
-        // offer far more than 4 candidates. Edge mode caps it to 2 per window (2 windows here).
-        Assert.Equal(4, slots.Count);
+        Assert.NotEmpty(slots);
+        Assert.All(slots, s => Assert.True(
+            s.StartTime >= PolandTime(2026, 9, 1, 9, 0) && s.StartTime <= PolandTime(2026, 9, 1, 10, 0)));
     }
 
     [Fact]

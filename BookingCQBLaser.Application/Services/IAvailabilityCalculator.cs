@@ -6,7 +6,7 @@ namespace BookingCQBLaser.Application.Services;
 /// <summary>
 /// Computes bookable arena time slots. Hides Poland-timezone conversion, the online-booking
 /// lead-time rule, arena open/close hours (including DST-safe boundary math), and the
-/// free-choice-vs-stick-to-edges slot algorithm behind two calls.
+/// waste-minimising slot-packing algorithm (see <see cref="SlotPacker"/>) behind two calls.
 /// </summary>
 public interface IAvailabilityCalculator
 {

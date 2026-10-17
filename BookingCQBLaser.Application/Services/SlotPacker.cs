@@ -1,15 +1,30 @@
 using BookingCQBLaser.Application.DTOs;
+using BookingCQBLaser.Domain.Enums;
 
 namespace BookingCQBLaser.Application.Services;
 
 /// <summary>
-/// Default packer, preserving the original behaviour: the first booking of an empty day may start
-/// anywhere on the grid (free-choice); once anything is on the calendar, later bookings must sit
-/// flush against an existing busy period or a day boundary (stick-to-edges), never floating.
+/// Waste-minimising packer. For each free window it offers every grid-aligned start whose leftover
+/// time — on both sides of the booking — can itself be fully filled by back-to-back bookings, so the
+/// day stays perfectly tileable while the customer keeps the widest choice that doesn't strand arena
+/// time. When a window can't be filled exactly (e.g. an odd 150-minute gap), it still offers the
+/// placements that strand the least.
 /// </summary>
+/// <remarks>
+/// The arena books on a fixed grid and every package occupies a whole multiple of it (90 or 120 min),
+/// so whether a leftover gap is fully fillable is the classic coin-problem: a gap is fillable iff it
+/// is a sum of package durations. For {90,120} the only unfillable sizes at or above one package are
+/// 30, 60 and 150 minutes — those are exactly the leftovers this packer avoids creating.
+/// </remarks>
 public sealed class SlotPacker : ISlotPacker
 {
     private readonly AvailabilityOptions _options;
+
+    // The distinct arena-occupancy durations any package can take — the "coins" for deciding whether
+    // a leftover gap can be filled exactly. Derived from the package table so it stays correct if the
+    // packages change.
+    private static readonly int[] BlockedDurationsMinutes =
+        Enum.GetValues<PackageType>().Select(p => p.GetBaseDurationMinutes()).Distinct().OrderBy(d => d).ToArray();
 
     public SlotPacker(AvailabilityOptions options)
     {
@@ -26,21 +41,104 @@ public sealed class SlotPacker : ISlotPacker
         var merged = MergeBusyPeriods(busyPeriods);
         var freeWindows = GetFreeWindows(dayStart, dayEnd, merged);
 
-        // The first booking of an empty day may start anywhere; once anything is on the calendar
-        // (a booking or an external block), every later booking must sit flush against an existing
-        // busy period or the day's open/close boundary — never floating with wasted gaps on both sides.
-        var isFirstBookingOfDay = merged.Count == 0;
-
         var slots = new List<TimeSlotDto>();
         foreach (var (windowStart, windowEnd) in freeWindows)
         {
-            var windowSlots = isFirstBookingOfDay
-                ? GenerateDenseSlotsForWindow(windowStart, windowEnd, packageBlockedDurationMinutes, clientGameDurationMinutes)
-                : GenerateEdgeSlotsForWindow(windowStart, windowEnd, packageBlockedDurationMinutes, clientGameDurationMinutes);
-            slots.AddRange(windowSlots);
+            slots.AddRange(PackWindow(windowStart, windowEnd, packageBlockedDurationMinutes, clientGameDurationMinutes));
         }
 
         return slots.OrderBy(s => s.StartTime).ToList();
+    }
+
+    /// <summary>
+    /// Offers, for one free window, the grid-aligned starts that strand the least arena time. On a
+    /// window that tiles exactly those are every start whose both leftovers are fully fillable (waste
+    /// zero); on a window that can't tile exactly, the least-wasteful starts are offered rather than
+    /// none, so an awkward gap still yields a bookable slot.
+    /// </summary>
+    private List<TimeSlotDto> PackWindow(
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        int packageBlockedDuration,
+        int clientGameDuration)
+    {
+        var interval = _options.SlotIntervalMinutes;
+        var windowMinutes = (int)(windowEnd - windowStart).TotalMinutes;
+
+        if (windowMinutes < packageBlockedDuration)
+        {
+            return new List<TimeSlotDto>();
+        }
+
+        // Every grid-aligned start that still leaves room for the package's blocked duration, with
+        // the arena time it would strand (unfillable leftover before + after the booking).
+        var candidates = new List<(DateTimeOffset Start, int Waste)>();
+        for (var start = windowStart; start.AddMinutes(packageBlockedDuration) <= windowEnd; start = start.AddMinutes(interval))
+        {
+            var before = (int)(start - windowStart).TotalMinutes;
+            var after = (int)(windowEnd - start).TotalMinutes - packageBlockedDuration;
+            candidates.Add((start, StrandedMinutes(before) + StrandedMinutes(after)));
+        }
+
+        var minWaste = candidates.Min(c => c.Waste);
+
+        var slots = new List<TimeSlotDto>();
+        foreach (var (start, waste) in candidates)
+        {
+            if (waste != minWaste) continue;
+
+            var maxAvailableDuration = (int)(windowEnd - start).TotalMinutes;
+            slots.Add(new TimeSlotDto(start, start.AddMinutes(clientGameDuration), maxAvailableDuration));
+        }
+
+        return slots;
+    }
+
+    /// <summary>
+    /// Arena minutes that would be stranded by a leftover gap of <paramref name="gapMinutes"/> — the
+    /// gap minus the most it can be filled with back-to-back bookings. Zero when the gap tiles exactly
+    /// (including an empty gap). Solved as the coin problem over the package durations.
+    /// </summary>
+    private int StrandedMinutes(int gapMinutes)
+    {
+        if (gapMinutes <= 0) return 0;
+
+        var interval = _options.SlotIntervalMinutes;
+
+        // Anything below the grid can never be booked, so it is stranded outright.
+        var gapUnits = gapMinutes / interval;
+        var subGridRemainder = gapMinutes - gapUnits * interval;
+
+        // Package durations in grid units (they are whole multiples of the grid).
+        var coins = BlockedDurationsMinutes
+            .Where(d => d % interval == 0)
+            .Select(d => d / interval)
+            .Where(u => u > 0)
+            .Distinct()
+            .ToArray();
+
+        // reachable[x] == can x grid-units be formed exactly by summing package durations.
+        var reachable = new bool[gapUnits + 1];
+        reachable[0] = true;
+        for (var x = 1; x <= gapUnits; x++)
+        {
+            foreach (var coin in coins)
+            {
+                if (x - coin >= 0 && reachable[x - coin])
+                {
+                    reachable[x] = true;
+                    break;
+                }
+            }
+        }
+
+        var largestFillableUnits = 0;
+        for (var x = gapUnits; x >= 0; x--)
+        {
+            if (reachable[x]) { largestFillableUnits = x; break; }
+        }
+
+        return subGridRemainder + (gapUnits - largestFillableUnits) * interval;
     }
 
     private static List<(DateTimeOffset Start, DateTimeOffset End)> GetFreeWindows(
@@ -81,62 +179,6 @@ public sealed class SlotPacker : ISlotPacker
         }
 
         return freeWindows;
-    }
-
-    /// <summary>
-    /// Free-choice mode: used only for the very first booking of an empty day. Offers every
-    /// interval-aligned start time that leaves enough room for the package's actual blocked duration.
-    /// </summary>
-    private List<TimeSlotDto> GenerateDenseSlotsForWindow(
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
-        int packageBlockedDuration,
-        int clientGameDuration)
-    {
-        var slots = new List<TimeSlotDto>();
-        var latestSlotStart = windowEnd.AddMinutes(-packageBlockedDuration);
-
-        for (var slotStart = windowStart; slotStart <= latestSlotStart; slotStart = slotStart.AddMinutes(_options.SlotIntervalMinutes))
-        {
-            var maxAvailableDuration = (int)(windowEnd - slotStart).TotalMinutes;
-            var displaySlotEnd = slotStart.AddMinutes(clientGameDuration);
-            slots.Add(new TimeSlotDto(slotStart, displaySlotEnd, maxAvailableDuration));
-        }
-
-        return slots;
-    }
-
-    /// <summary>
-    /// Stick-to-edges mode: used once anything is already on the calendar that day. A free window
-    /// only offers a start flush against its own start, or a start that makes the booking end flush
-    /// against the window's end — never a start floating in the middle, which would strand unusable
-    /// time on both sides.
-    /// </summary>
-    private static List<TimeSlotDto> GenerateEdgeSlotsForWindow(
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
-        int packageBlockedDuration,
-        int clientGameDuration)
-    {
-        var slots = new List<TimeSlotDto>();
-        var windowDurationMinutes = (int)(windowEnd - windowStart).TotalMinutes;
-
-        if (windowDurationMinutes < packageBlockedDuration)
-        {
-            return slots;
-        }
-
-        var flushStart = windowStart;
-        slots.Add(new TimeSlotDto(flushStart, flushStart.AddMinutes(clientGameDuration), windowDurationMinutes));
-
-        var flushEndStart = windowEnd.AddMinutes(-packageBlockedDuration);
-        if (flushEndStart != flushStart)
-        {
-            var maxAvailableDuration = (int)(windowEnd - flushEndStart).TotalMinutes;
-            slots.Add(new TimeSlotDto(flushEndStart, flushEndStart.AddMinutes(clientGameDuration), maxAvailableDuration));
-        }
-
-        return slots;
     }
 
     private static List<(DateTimeOffset Start, DateTimeOffset End)> MergeBusyPeriods(
