@@ -1,0 +1,18 @@
+# Keep the build context small and never bake secrets into the image.
+.git
+.github
+**/bin
+**/obj
+laser-tag-booking-app
+docs
+*.md
+.vs
+.vscode
+.idea
+
+# Runtime secrets live on the server (mounted / --env-file), never in the image.
+.env
+.env.*
+*.key
+*.pem
+lasertagbooking-*.json

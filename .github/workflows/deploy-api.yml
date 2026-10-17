@@ -1,0 +1,67 @@
+name: Build & Deploy API
+
+# Builds the backend on a GitHub runner (fast), ships the image to the Oracle box as a
+# compressed tarball, and the server loads + restarts it. Runtime secrets (.env, the Google
+# credential JSON) stay on the server and never enter CI or the image.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'BookingCQBLaser.Api/**'
+      - 'BookingCQBLaser.Application/**'
+      - 'BookingCQBLaser.Domain/**'
+      - 'BookingCQBLaser.Infrastructure/**'
+      - 'BookingCQBLaser.Tests/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/deploy-api.yml'
+      - 'scripts/deploy-api-remote.sh'
+  workflow_dispatch:
+
+# Never let two deploys race on the single server.
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Gate the deploy on a green test suite.
+      - name: Test
+        run: dotnet test BookingCQBLaser.Tests/BookingCQBLaser.Tests.csproj -c Release --nologo
+
+      - name: Build image
+        run: docker build -t comboarena-api:latest .
+
+      - name: Save image
+        run: docker save comboarena-api:latest | gzip > image.tar.gz
+
+      - name: Prepare SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Copy image to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: scp -i ~/.ssh/deploy_key image.tar.gz "$SSH_USER@$SSH_HOST:/home/ubuntu/image.tar.gz"
+
+      - name: Deploy on server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" 'bash -s' < scripts/deploy-api-remote.sh

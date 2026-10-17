@@ -3,6 +3,9 @@
 ###############################################################################
 * text=auto
 
+# Shell scripts must stay LF - they are piped to bash on the Linux server/runner.
+*.sh text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #
