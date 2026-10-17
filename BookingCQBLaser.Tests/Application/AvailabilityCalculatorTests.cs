@@ -17,13 +17,15 @@ public class AvailabilityCalculatorTests
 
     private readonly Mock<IBookingRepository> _repository = new();
     private readonly Mock<IGoogleCalendarService> _googleCalendarService = new();
+    private readonly AvailabilityOptions _options = new();
 
     // Fixed "now" comfortably before every target date used below, so the lead-time rule never
     // interferes with the scenario under test.
     private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero));
 
-    private AvailabilityCalculator CreateCalculator() =>
-        new(_repository.Object, _googleCalendarService.Object, NullLogger<AvailabilityCalculator>.Instance, _timeProvider);
+    private AvailabilityCalculator CreateCalculator(TimeProvider? timeProvider = null) =>
+        new(_repository.Object, _googleCalendarService.Object, new SlotPacker(_options), _options,
+            NullLogger<AvailabilityCalculator>.Instance, timeProvider ?? _timeProvider);
 
     private static DateTimeOffset PolandTime(int year, int month, int day, int hour, int minute)
     {
@@ -173,9 +175,7 @@ public class AvailabilityCalculatorTests
     {
         // "now" fixed just before the Friday 22:00 Poland cutoff for the following Saturday.
         var friday10PM = PolandTime(2026, 8, 7, 21, 59);
-        var calculator = new AvailabilityCalculator(
-            _repository.Object, _googleCalendarService.Object, NullLogger<AvailabilityCalculator>.Instance,
-            new FakeTimeProvider(friday10PM));
+        var calculator = CreateCalculator(new FakeTimeProvider(friday10PM));
         var saturday = PolandTime(2026, 8, 8, 10, 0);
 
         Assert.True(calculator.IsOnlineBookingAllowed(saturday));
@@ -185,9 +185,7 @@ public class AvailabilityCalculatorTests
     public void IsOnlineBookingAllowed_Saturday_AfterFriday10PMCutoff_IsDenied()
     {
         var friday1001PM = PolandTime(2026, 8, 7, 22, 1);
-        var calculator = new AvailabilityCalculator(
-            _repository.Object, _googleCalendarService.Object, NullLogger<AvailabilityCalculator>.Instance,
-            new FakeTimeProvider(friday1001PM));
+        var calculator = CreateCalculator(new FakeTimeProvider(friday1001PM));
         var saturday = PolandTime(2026, 8, 8, 10, 0);
 
         Assert.False(calculator.IsOnlineBookingAllowed(saturday));
@@ -200,8 +198,7 @@ public class AvailabilityCalculatorTests
         // Midnight that day is still +1; 09:00 is already +2. The old bug computed arena open
         // time using midnight's offset, which would be an hour wrong here.
         var earlyMarch = new FakeTimeProvider(new DateTimeOffset(2027, 3, 1, 0, 0, 0, TimeSpan.Zero));
-        var calculator = new AvailabilityCalculator(
-            _repository.Object, _googleCalendarService.Object, NullLogger<AvailabilityCalculator>.Instance, earlyMarch);
+        var calculator = CreateCalculator(earlyMarch);
         var date = PolandTime(2027, 3, 28, 10, 0);
 
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S1)).ToList();

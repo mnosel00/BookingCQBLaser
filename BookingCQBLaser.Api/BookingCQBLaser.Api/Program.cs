@@ -62,6 +62,9 @@ builder.Services.AddScoped<HotPayIpWhitelistFilter>();
 
 // Register application services
 builder.Services.AddSingleton(TimeProvider.System);
+// Arena hours / grid / lead-time knobs and the (stateless) slot packer.
+builder.Services.AddSingleton(new AvailabilityOptions());
+builder.Services.AddSingleton<ISlotPacker, SlotPacker>();
 builder.Services.AddScoped<IAvailabilityCalculator, AvailabilityCalculator>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
