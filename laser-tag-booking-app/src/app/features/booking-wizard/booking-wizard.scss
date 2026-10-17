@@ -878,3 +878,20 @@ button[type='submit'] {
 
   &:hover { color: var(--primary); }
 }
+
+/* Focus is moved to the step heading on each step change so screen readers announce the new
+   step; the heading isn't interactive, so no focus ring (it would imply it's clickable). */
+h2[tabindex="-1"]:focus { outline: none; }
+
+/* Visually hidden but exposed to assistive tech (e.g. the slot-loading live region). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

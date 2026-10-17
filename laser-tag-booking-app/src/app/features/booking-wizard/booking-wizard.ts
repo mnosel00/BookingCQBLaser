@@ -1,6 +1,6 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject } from '@angular/core';
+import { Component, ElementRef, inject } from '@angular/core';
 import {
   FormBuilder,
   FormControl,
@@ -37,6 +37,11 @@ const PHONE_PATTERN = /^\d{3}[\s-]?\d{3}[\s-]?\d{3}$/;
 export class BookingWizard {
   private readonly bookingApiService = inject(BookingApiService);
   private readonly formBuilder = inject(FormBuilder);
+  private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  // Spoken by a visually-hidden aria-live region when slot loading finishes, so screen-reader
+  // users are told the result (sighted users just see the tiles appear). Empty while loading.
+  slotsAnnouncement = '';
 
   currentStep = 1;
   selectedPackage: PackageType | null = null;
@@ -355,6 +360,43 @@ export class BookingWizard {
   previousStep(): void {
     if (this.currentStep > 1) {
       this.currentStep--;
+      this.focusStepHeading(this.currentStep);
+    }
+  }
+
+  // Move keyboard/screen-reader focus to the heading of the step we just switched to. The
+  // headings carry tabindex="-1" so they can receive focus programmatically without joining
+  // the tab order. setTimeout defers until after Angular has swapped the *ngIf sections in,
+  // so the target heading exists; a missing heading (e.g. in a non-rendered test) is a no-op.
+  private focusStepHeading(step: number): void {
+    setTimeout(() => {
+      this.hostRef.nativeElement
+        .querySelector<HTMLElement>(`#step-${step}-title`)
+        ?.focus();
+    });
+  }
+
+  // Polish plural of "termin" (slot): 1 → termin, 2–4 → terminy, else → terminów,
+  // with the usual 12–14 exception that forces "terminów".
+  private pluralTermin(n: number): string {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (n === 1) return 'termin';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'terminy';
+    return 'terminów';
+  }
+
+  // Build the live-region message describing the just-loaded slots.
+  private announceSlots(): void {
+    const compatible = this.availableSlotsCompatible.length;
+    const incompatible = this.availableSlotsIncompatible.length;
+
+    if (compatible > 0) {
+      this.slotsAnnouncement = `Załadowano ${compatible} ${this.pluralTermin(compatible)}.`;
+    } else if (incompatible > 0) {
+      this.slotsAnnouncement = 'Brak terminów dla wybranego pakietu. Dostępne terminy wymagają zmiany pakietu.';
+    } else {
+      this.slotsAnnouncement = 'Brak dostępnych terminów dla wybranej daty.';
     }
   }
 
@@ -426,6 +468,7 @@ export class BookingWizard {
     participantsCtrl.updateValueAndValidity();
 
     this.currentStep = 2;
+    this.focusStepHeading(2);
   }
 
   isOnlineBookingAllowed(selectedDate: Date): boolean {
@@ -464,6 +507,7 @@ export class BookingWizard {
     this.selectedSlot = null;
     this.showPhoneContactWarning = false;
     this.slotsLoadError = false;
+    this.slotsAnnouncement = '';
 
     if (!date || this.selectedPackage === null) return;
 
@@ -478,6 +522,7 @@ export class BookingWizard {
         this.availableSlotsCompatible = slots.filter(s => this.isSlotCompatible(s));
         this.availableSlotsIncompatible = slots.filter(s => !this.isSlotCompatible(s));
         this.isLoadingSlots = false;
+        this.announceSlots();
       },
       error: () => { this.isLoadingSlots = false; this.slotsLoadError = true; }
     });
@@ -493,6 +538,7 @@ export class BookingWizard {
     this.submitErrorMessage = null;
     this.currentIdempotencyKey = crypto.randomUUID();
     this.currentStep = 3;
+    this.focusStepHeading(3);
   }
 
   submitBooking(): void {
@@ -533,6 +579,7 @@ export class BookingWizard {
           this.submitErrorMessage = 'Ten termin został właśnie zarezerwowany przez kogoś innego. Wybierz proszę inny termin.';
           this.selectedSlot = null;
           this.currentStep = 2;
+          this.focusStepHeading(2);
           if (this.selectedDate && this.selectedPackage !== null) {
             this.onDateChange(this.selectedDateValue);
           }

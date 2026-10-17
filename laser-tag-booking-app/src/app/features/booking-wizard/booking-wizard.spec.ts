@@ -24,6 +24,11 @@ function slot(startTime: string, maxAvailableDurationMinutes: number): TimeSlot 
   return { startTime, endTime: startTime, maxAvailableDurationMinutes };
 }
 
+// N slots long enough to be compatible with PackageType.Max (needs 120 min per DEFAULT_DURATIONS).
+function compatibleSlots(n: number): TimeSlot[] {
+  return Array.from({ length: n }, () => slot('2026-09-01T09:00:00+02:00', 120));
+}
+
 const VALID_FORM_VALUE = {
   firstName: 'Jan', lastName: 'Kowalski', email: 'jan@example.com', phone: '123456789',
   participantsCount: 10, acceptTerms: true, acceptLegal: true, isAdultGroup: true, ageRange: ''
@@ -326,6 +331,58 @@ describe('BookingWizard', () => {
         (new Date(component.maxBookingDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
       expect(diffDays).toBeGreaterThan(150);
       expect(diffDays).toBeLessThan(200);
+    });
+  });
+
+  describe('slot-loading announcement (screen-reader live region)', () => {
+    function loadWith(slots: TimeSlot[]) {
+      const component = createComponent();
+      component.selectedPackage = PackageType.Max; // needs 120 min
+      apiSpy.getAvailableSlots.mockReturnValue(of(slots));
+      component.onDateChange(futureWeekday());
+      return component;
+    }
+
+    it('announces the compatible slot count with the correct Polish plural (termin/terminy/terminów)', () => {
+      // One component, reloaded several times (TestBed can't be reconfigured mid-test).
+      const component = createComponent();
+      component.selectedPackage = PackageType.Max;
+      const date = futureWeekday();
+      const announceFor = (n: number) => {
+        apiSpy.getAvailableSlots.mockReturnValue(of(compatibleSlots(n)));
+        component.onDateChange(date);
+        return component.slotsAnnouncement;
+      };
+
+      expect(announceFor(1)).toBe('Załadowano 1 termin.');
+      expect(announceFor(3)).toBe('Załadowano 3 terminy.');
+      expect(announceFor(6)).toBe('Załadowano 6 terminów.');
+      expect(announceFor(12)).toBe('Załadowano 12 terminów.'); // 12–14 exception
+      expect(announceFor(22)).toBe('Załadowano 22 terminy.');
+    });
+
+    it('tells the user when the only available slots need a different package', () => {
+      const component = loadWith([slot('2026-09-01T09:00:00+02:00', 90)]); // < 120 → incompatible
+      expect(component.availableSlotsCompatible.length).toBe(0);
+      expect(component.slotsAnnouncement).toBe(
+        'Brak terminów dla wybranego pakietu. Dostępne terminy wymagają zmiany pakietu.'
+      );
+    });
+
+    it('announces an empty result when the date has no slots at all', () => {
+      expect(loadWith([]).slotsAnnouncement).toBe('Brak dostępnych terminów dla wybranej daty.');
+    });
+
+    it('clears the previous announcement when a new load begins', () => {
+      const component = createComponent();
+      component.selectedPackage = PackageType.Max;
+      apiSpy.getAvailableSlots.mockReturnValue(of(compatibleSlots(2)));
+      component.onDateChange(futureWeekday());
+      expect(component.slotsAnnouncement).toContain('Załadowano');
+
+      apiSpy.getAvailableSlots.mockReturnValue(NEVER); // in-flight: never resolves
+      component.onDateChange(futureWeekday());
+      expect(component.slotsAnnouncement).toBe('');
     });
   });
 
