@@ -534,11 +534,26 @@ export class BookingWizard {
   private currentIdempotencyKey: string | null = null;
 
   selectSlot(slot: TimeSlot): void {
+    // The participant count lives on step 2; don't let a slot click jump to step 3 until it's
+    // valid. Surface the error and move focus to the field so the user knows why.
+    const participantsCtrl = this.customerForm.get('participantsCount')!;
+    if (participantsCtrl.invalid) {
+      participantsCtrl.markAsTouched();
+      this.focusParticipantsField();
+      return;
+    }
+
     this.selectedSlot = slot;
     this.submitErrorMessage = null;
     this.currentIdempotencyKey = crypto.randomUUID();
     this.currentStep = 3;
     this.focusStepHeading(3);
+  }
+
+  private focusParticipantsField(): void {
+    setTimeout(() => {
+      this.hostRef.nativeElement.querySelector<HTMLElement>('#participantsCount')?.focus();
+    });
   }
 
   submitBooking(): void {
