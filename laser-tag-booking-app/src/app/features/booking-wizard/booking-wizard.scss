@@ -533,6 +533,17 @@ input[type='date'] {
   cursor: pointer;
 }
 
+/* Visible keyboard focus rings on the date chips and slot tiles (incl. the now
+   aria-disabled, still-focusable incompatible tiles). The custom "Inna data" chip is
+   driven by its overlaid opacity:0 native input, so its focus is projected onto the
+   chip via :has(). */
+.date-chip:focus-visible,
+.slot-tile:focus-visible,
+.date-chip--custom:has(input[type='date']:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .slot-group {
   margin-top: 1.25rem;
 
@@ -640,35 +651,15 @@ input[type='date'] {
   align-items: flex-start;
 }
 
-.slot-tooltip {
-  display: none;
-  position: absolute;
-  bottom: -55px;
-  left: 0;
-  background: #7f1d1d;
-  color: #ffffff;
-  padding: 0.6rem 0.8rem;
-  border-radius: 8px;
-  font-size: 0.8rem;
+/* The reason a slot is incompatible is persistent text (not a hover-only tooltip) and
+   is linked to its tile via aria-describedby, so keyboard and screen-reader users get it. */
+.slot-reason {
+  display: block;
+  font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.4;
-  width: max-content;
-  max-width: 200px;
-  z-index: 10;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  pointer-events: none;
-
-  @media (min-width: 480px) {
-    bottom: auto;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: 0.5rem;
-  }
-}
-
-.incompatible-slot-item:hover .slot-tooltip {
-  display: block;
+  color: #fca5a5;
+  max-width: 240px;
 }
 
 .loading-text, .empty-state {
