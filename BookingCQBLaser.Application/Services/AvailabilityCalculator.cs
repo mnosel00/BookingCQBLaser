@@ -7,23 +7,25 @@ namespace BookingCQBLaser.Application.Services;
 
 public class AvailabilityCalculator : IAvailabilityCalculator
 {
-    private const int SlotIntervalMinutes = 30;
-
-    private static readonly TimeOnly ArenaOpenTime = new(9, 0);
-
     private readonly IBookingRepository _repository;
     private readonly IGoogleCalendarService _googleCalendarService;
+    private readonly ISlotPacker _slotPacker;
+    private readonly AvailabilityOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<AvailabilityCalculator> _logger;
 
     public AvailabilityCalculator(
         IBookingRepository repository,
         IGoogleCalendarService googleCalendarService,
+        ISlotPacker slotPacker,
+        AvailabilityOptions options,
         ILogger<AvailabilityCalculator> logger,
         TimeProvider timeProvider)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _googleCalendarService = googleCalendarService ?? throw new ArgumentNullException(nameof(googleCalendarService));
+        _slotPacker = slotPacker ?? throw new ArgumentNullException(nameof(slotPacker));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
@@ -49,30 +51,30 @@ public class AvailabilityCalculator : IAvailabilityCalculator
         return IsOnlineBookingAllowedCore(requestedDateInPoland, nowInPoland);
     }
 
-    private static bool IsOnlineBookingAllowedCore(DateTimeOffset targetDate, DateTimeOffset nowInPoland)
+    private bool IsOnlineBookingAllowedCore(DateTimeOffset targetDate, DateTimeOffset nowInPoland)
     {
         if (targetDate.Date < nowInPoland.Date) return false;
 
         if (targetDate.DayOfWeek == DayOfWeek.Saturday)
         {
-            var deadline = targetDate.Date.AddDays(-1).AddHours(22); // Friday 22:00
+            var deadline = targetDate.Date.AddDays(-1).AddHours(_options.WeekendCutoffHour); // Friday 22:00
             return nowInPoland <= deadline;
         }
         if (targetDate.DayOfWeek == DayOfWeek.Sunday)
         {
-            var deadline = targetDate.Date.AddDays(-1).AddHours(22); // Saturday 22:00
+            var deadline = targetDate.Date.AddDays(-1).AddHours(_options.WeekendCutoffHour); // Saturday 22:00
             return nowInPoland <= deadline;
         }
 
         // Monday-Friday (3 calendar days rule)
-        return targetDate.Date >= nowInPoland.Date.AddDays(3);
+        return targetDate.Date >= nowInPoland.Date.AddDays(_options.WeekdayLeadTimeDays);
     }
 
-    private static TimeOnly GetArenaCloseTime(DayOfWeek dayOfWeek)
+    private TimeOnly GetArenaCloseTime(DayOfWeek dayOfWeek)
     {
         return dayOfWeek == DayOfWeek.Sunday
-            ? new TimeOnly(16, 0)
-            : new TimeOnly(23, 0);
+            ? _options.SundayCloseTime
+            : _options.WeekdayCloseTime;
     }
 
     /// <summary>
@@ -109,7 +111,7 @@ public class AvailabilityCalculator : IAvailabilityCalculator
         var dateOnlyInPoland = requestedDateInPoland.Date;
         var arenaCloseTime = GetArenaCloseTime(requestedDateInPoland.DayOfWeek);
 
-        var dayStart = BuildPolandBoundary(polandTimeZone, dateOnlyInPoland, ArenaOpenTime);
+        var dayStart = BuildPolandBoundary(polandTimeZone, dateOnlyInPoland, _options.ArenaOpenTime);
         var dayEnd = BuildPolandBoundary(polandTimeZone, dateOnlyInPoland, arenaCloseTime);
 
         // Convert boundaries to UTC for DB and Google Calendar queries
@@ -118,130 +120,81 @@ public class AvailabilityCalculator : IAvailabilityCalculator
             dayEnd.ToUniversalTime(),
             cancellationToken);
 
-        // Get free windows between busy periods
-        var freeWindows = GetFreeWindows(dayStart, dayEnd, busyPeriods);
-
-        // The first booking of an empty day may start anywhere; once anything is on the
-        // calendar (a booking or an external Google Calendar block), every later booking must
-        // sit flush against an existing busy period or the day's open/close boundary — never
-        // floating with wasted gaps on both sides.
-        var isFirstBookingOfDay = busyPeriods.Count == 0;
-
-        var availableSlots = new List<TimeSlotDto>();
-        foreach (var (windowStart, windowEnd) in freeWindows)
+        // The packing rule depends on the day of week. Timezone/DST-aware boundary and anchor instants
+        // are built here; the pure packer only sees instants.
+        var availableSlots = requestedDateInPoland.DayOfWeek switch
         {
-            var windowSlots = isFirstBookingOfDay
-                ? GenerateDenseSlotsForWindow(windowStart, windowEnd, packageBlockedDuration, clientGameDuration)
-                : GenerateEdgeSlotsForWindow(windowStart, windowEnd, packageBlockedDuration, clientGameDuration);
-            availableSlots.AddRange(windowSlots);
-        }
-
-        availableSlots = availableSlots.OrderBy(s => s.StartTime).ToList();
+            DayOfWeek.Sunday => PackSunday(polandTimeZone, dateOnlyInPoland, dayStart, dayEnd, busyPeriods, packageBlockedDuration, clientGameDuration),
+            DayOfWeek.Saturday => _slotPacker.PackTileable(dayStart, dayEnd, busyPeriods, packageBlockedDuration, clientGameDuration),
+            _ => PackWeekday(polandTimeZone, dateOnlyInPoland, dayStart, dayEnd, busyPeriods, packageBlockedDuration, clientGameDuration),
+        };
 
         _logger.LogInformation(
-            "Found {Count} available slots for {Date} with package {Package} across {WindowCount} free windows ({Mode} mode)",
-            availableSlots.Count, date.Date, package, freeWindows.Count, isFirstBookingOfDay ? "free-choice" : "stick-to-edges");
+            "Found {Count} available slots for {Date} ({Day}) with package {Package}",
+            availableSlots.Count, date.Date, requestedDateInPoland.DayOfWeek, package);
 
         return availableSlots;
     }
 
-    private static List<(DateTimeOffset Start, DateTimeOffset End)> GetFreeWindows(
-        DateTimeOffset dayStart,
-        DateTimeOffset dayEnd,
-        List<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods)
+    /// <summary>
+    /// Sunday: the first group of the day may start at any grid time between open and
+    /// <see cref="AvailabilityOptions.SundayFirstStartLatest"/>; once any group exists, later groups
+    /// must stick flush to an existing booking. Close is earlier than on other days.
+    /// </summary>
+    private IReadOnlyList<TimeSlotDto> PackSunday(
+        TimeZoneInfo tz, DateTime date, DateTimeOffset dayStart, DateTimeOffset dayEnd,
+        IReadOnlyList<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods,
+        int blocked, int client)
     {
-        var freeWindows = new List<(DateTimeOffset Start, DateTimeOffset End)>();
-
-        if (busyPeriods.Count == 0)
-        {
-            freeWindows.Add((dayStart, dayEnd));
-            return freeWindows;
-        }
-
-        // Window before first busy period
-        if (dayStart < busyPeriods[0].Start)
-        {
-            freeWindows.Add((dayStart, busyPeriods[0].Start));
-        }
-
-        // Windows between consecutive busy periods
-        for (int i = 0; i < busyPeriods.Count - 1; i++)
-        {
-            var windowStart = busyPeriods[i].End;
-            var windowEnd = busyPeriods[i + 1].Start;
-
-            if (windowStart < windowEnd)
-            {
-                freeWindows.Add((windowStart, windowEnd));
-            }
-        }
-
-        // Window after last busy period
-        if (busyPeriods[^1].End < dayEnd)
-        {
-            freeWindows.Add((busyPeriods[^1].End, dayEnd));
-        }
-
-        return freeWindows;
+        var anchors = BuildAnchorGrid(tz, date, _options.ArenaOpenTime, _options.SundayFirstStartLatest);
+        var hasGroup = busyPeriods.Any(b => b.Start >= dayStart);
+        return _slotPacker.PackAnchoredThenFlush(dayStart, dayEnd, anchors, hasGroup, busyPeriods, blocked, client);
     }
 
     /// <summary>
-    /// Free-choice mode: used only for the very first booking of an empty day. Offers every
-    /// interval-aligned start time that leaves enough room for the package's actual blocked
-    /// duration.
+    /// Monday–Friday: a morning session (tileable starts up to <see cref="AvailabilityOptions.MorningLatestStart"/>,
+    /// whose blocks may run into the otherwise-dead afternoon) and an evening session that anchors the
+    /// first group to fixed starts then sticks flush. Nothing is bookable between the two sessions.
     /// </summary>
-    private static List<TimeSlotDto> GenerateDenseSlotsForWindow(
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
-        int packageBlockedDuration,
-        int clientGameDuration)
+    private IReadOnlyList<TimeSlotDto> PackWeekday(
+        TimeZoneInfo tz, DateTime date, DateTimeOffset dayStart, DateTimeOffset dayEnd,
+        IReadOnlyList<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods,
+        int blocked, int client)
     {
-        var slots = new List<TimeSlotDto>();
-        var latestSlotStart = windowEnd.AddMinutes(-packageBlockedDuration);
+        var morningLatestStart = BuildPolandBoundary(tz, date, _options.MorningLatestStart);
+        var eveningFloor = BuildPolandBoundary(tz, date, _options.EveningWindowStart);
 
-        for (var slotStart = windowStart; slotStart <= latestSlotStart; slotStart = slotStart.AddMinutes(SlotIntervalMinutes))
+        var morning = _slotPacker
+            .PackTileable(dayStart, dayEnd, busyPeriods, blocked, client)
+            .Where(s => s.StartTime <= morningLatestStart);
+
+        var eveningAnchors = BuildAnchorGrid(tz, date, _options.EveningWindowStart, _options.EveningWindowEnd);
+        eveningAnchors.Add(BuildPolandBoundary(tz, date, _options.EveningExtraAnchor));
+
+        // A morning booking never pushes the evening into flush mode - only a booking that starts in
+        // the evening session does.
+        var eveningHasGroup = busyPeriods.Any(b => b.Start >= eveningFloor);
+        var evening = _slotPacker.PackAnchoredThenFlush(eveningFloor, dayEnd, eveningAnchors, eveningHasGroup, busyPeriods, blocked, client);
+
+        return morning.Concat(evening).OrderBy(s => s.StartTime).ToList();
+    }
+
+    /// <summary>Grid-aligned start instants from <paramref name="from"/> to <paramref name="to"/> inclusive, DST-safe.</summary>
+    private List<DateTimeOffset> BuildAnchorGrid(TimeZoneInfo tz, DateTime date, TimeOnly from, TimeOnly to)
+    {
+        var anchors = new List<DateTimeOffset>();
+        for (var t = from; t <= to; t = t.AddMinutes(_options.SlotIntervalMinutes))
         {
-            var maxAvailableDuration = (int)(windowEnd - slotStart).TotalMinutes;
-            var displaySlotEnd = slotStart.AddMinutes(clientGameDuration);
-            slots.Add(new TimeSlotDto(slotStart, displaySlotEnd, maxAvailableDuration));
+            anchors.Add(BuildPolandBoundary(tz, date, t));
         }
-
-        return slots;
+        return anchors;
     }
 
     /// <summary>
-    /// Stick-to-edges mode: used once anything is already on the calendar that day. A free
-    /// window only offers a start flush against its own start, or a start that makes the booking
-    /// end flush against the window's end — never a start floating in the middle, which would
-    /// strand unusable time on both sides.
+    /// Gathers everything that occupies arena time in the window — local bookings that aren't
+    /// already mirrored into Google Calendar, plus Google Calendar busy blocks — as a raw, unmerged
+    /// list. Overlap merging and free-window computation are the packer's job.
     /// </summary>
-    private static List<TimeSlotDto> GenerateEdgeSlotsForWindow(
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
-        int packageBlockedDuration,
-        int clientGameDuration)
-    {
-        var slots = new List<TimeSlotDto>();
-        var windowDurationMinutes = (int)(windowEnd - windowStart).TotalMinutes;
-
-        if (windowDurationMinutes < packageBlockedDuration)
-        {
-            return slots;
-        }
-
-        var flushStart = windowStart;
-        slots.Add(new TimeSlotDto(flushStart, flushStart.AddMinutes(clientGameDuration), windowDurationMinutes));
-
-        var flushEndStart = windowEnd.AddMinutes(-packageBlockedDuration);
-        if (flushEndStart != flushStart)
-        {
-            var maxAvailableDuration = (int)(windowEnd - flushEndStart).TotalMinutes;
-            slots.Add(new TimeSlotDto(flushEndStart, flushEndStart.AddMinutes(clientGameDuration), maxAvailableDuration));
-        }
-
-        return slots;
-    }
-
     private async Task<List<(DateTimeOffset Start, DateTimeOffset End)>> GetCombinedBusyPeriodsAsync(
         DateTimeOffset dayStart,
         DateTimeOffset dayEnd,
@@ -266,31 +219,6 @@ public class AvailabilityCalculator : IAvailabilityCalculator
         }
 
         busyPeriods.AddRange(googleBusyPeriods);
-        return MergeBusyPeriods(busyPeriods);
-    }
-
-    private static List<(DateTimeOffset Start, DateTimeOffset End)> MergeBusyPeriods(
-        List<(DateTimeOffset Start, DateTimeOffset End)> periods)
-    {
-        if (periods.Count == 0) return periods;
-
-        var sorted = periods.OrderBy(p => p.Start).ToList();
-        var merged = new List<(DateTimeOffset Start, DateTimeOffset End)> { sorted[0] };
-
-        foreach (var current in sorted.Skip(1))
-        {
-            var last = merged[^1];
-
-            if (current.Start <= last.End)
-            {
-                merged[^1] = (last.Start, current.End > last.End ? current.End : last.End);
-            }
-            else
-            {
-                merged.Add(current);
-            }
-        }
-
-        return merged;
+        return busyPeriods;
     }
 }

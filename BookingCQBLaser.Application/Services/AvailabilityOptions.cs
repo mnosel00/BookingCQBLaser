@@ -1,0 +1,50 @@
+namespace BookingCQBLaser.Application.Services;
+
+/// <summary>
+/// Tunable knobs for availability: arena hours, the slot grid interval, and the online-booking
+/// lead-time rule. Previously hardcoded constants spread across <see cref="AvailabilityCalculator"/>;
+/// pulled into one place so hours or lead time can change by configuration rather than a recompile,
+/// and so the pure <see cref="SlotPacker"/> can be driven with explicit values in tests.
+/// Defaults reproduce the original hardcoded behaviour.
+/// </summary>
+public sealed class AvailabilityOptions
+{
+    /// <summary>Grid the arena books on; every offered start is aligned to this interval.</summary>
+    public int SlotIntervalMinutes { get; init; } = 30;
+
+    /// <summary>Daily arena opening time (local Poland wall-clock).</summary>
+    public TimeOnly ArenaOpenTime { get; init; } = new(9, 0);
+
+    /// <summary>Closing time on every day except Sunday.</summary>
+    public TimeOnly WeekdayCloseTime { get; init; } = new(23, 0);
+
+    /// <summary>Closing time on Sunday (the arena shuts earlier).</summary>
+    public TimeOnly SundayCloseTime { get; init; } = new(16, 0);
+
+    /// <summary>
+    /// Latest start time for a Monday–Friday morning group (inclusive). The afternoon between this
+    /// and the evening session is dead (no new starts); a morning block may run past it.
+    /// </summary>
+    public TimeOnly MorningLatestStart { get; init; } = new(13, 0);
+
+    /// <summary>Earliest start of the Monday–Friday evening session; also its flush floor.</summary>
+    public TimeOnly EveningWindowStart { get; init; } = new(17, 30);
+
+    /// <summary>Latest grid start inside the evening anchor window (so anchors are 17:30 / 18:00 / 18:30).</summary>
+    public TimeOnly EveningWindowEnd { get; init; } = new(18, 30);
+
+    /// <summary>An extra discrete evening anchor outside the 17:30–18:30 window.</summary>
+    public TimeOnly EveningExtraAnchor { get; init; } = new(19, 30);
+
+    /// <summary>Latest start for the first Sunday group (inclusive); the day must open between open and this.</summary>
+    public TimeOnly SundayFirstStartLatest { get; init; } = new(12, 0);
+
+    /// <summary>Minimum calendar days ahead a Monday–Friday booking must be made.</summary>
+    public int WeekdayLeadTimeDays { get; init; } = 3;
+
+    /// <summary>
+    /// Hour (local Poland) on the day before a Saturday/Sunday after which online booking for that
+    /// weekend day closes — Friday 22:00 for Saturday, Saturday 22:00 for Sunday.
+    /// </summary>
+    public int WeekendCutoffHour { get; init; } = 22;
+}

@@ -17,13 +17,15 @@ public class AvailabilityCalculatorTests
 
     private readonly Mock<IBookingRepository> _repository = new();
     private readonly Mock<IGoogleCalendarService> _googleCalendarService = new();
+    private readonly AvailabilityOptions _options = new();
 
     // Fixed "now" comfortably before every target date used below, so the lead-time rule never
     // interferes with the scenario under test.
     private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero));
 
-    private AvailabilityCalculator CreateCalculator() =>
-        new(_repository.Object, _googleCalendarService.Object, NullLogger<AvailabilityCalculator>.Instance, _timeProvider);
+    private AvailabilityCalculator CreateCalculator(TimeProvider? timeProvider = null) =>
+        new(_repository.Object, _googleCalendarService.Object, new SlotPacker(_options), _options,
+            NullLogger<AvailabilityCalculator>.Instance, timeProvider ?? _timeProvider);
 
     private static DateTimeOffset PolandTime(int year, int month, int day, int hour, int minute)
     {
@@ -65,65 +67,71 @@ public class AvailabilityCalculatorTests
     }
 
     [Fact]
-    public async Task GetAvailableTimeSlotsAsync_EmptyDay_OffersEveryIntervalAlignedStart()
+    public async Task GetAvailableTimeSlotsAsync_Weekday_EmptyDay_MorningTileableStartsPlusEveningAnchors()
     {
-        // Tuesday, arena hours 09:00-23:00 (14h), S2 needs 90 blocked minutes.
-        var calculator = CreateCalculator();
-        var date = PolandTime(2026, 9, 1, 12, 0);
-
-        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
-
-        // 09:00 to 21:30 inclusive, every 30 minutes = 26 candidate starts.
-        Assert.Equal(26, slots.Count);
-        Assert.Equal(PolandTime(2026, 9, 1, 9, 0), slots.First().StartTime);
-        Assert.Equal(PolandTime(2026, 9, 1, 21, 30), slots.Last().StartTime);
-        Assert.Equal(840, slots.First().MaxAvailableDurationMinutes); // full day still open
-        Assert.Equal(90, slots.Last().MaxAvailableDurationMinutes); // exactly the package's duration
-    }
-
-    [Fact]
-    public async Task GetAvailableTimeSlotsAsync_OneExistingLocalBooking_OnlyOffersFlushEdgeSlots()
-    {
-        // Existing booking 14:00-15:30 splits the day into two free windows.
-        SetLocalBookings(LocalBooking(PolandTime(2026, 9, 1, 14, 0), 90));
-        var calculator = CreateCalculator();
-        var date = PolandTime(2026, 9, 1, 12, 0);
-
-        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
-
-        // Before-window [09:00,14:00): flush-start (09:00) + flush-end (12:30).
-        // After-window [15:30,23:00): flush-start (15:30) + flush-end (21:30).
-        Assert.Equal(4, slots.Count);
-        var starts = slots.Select(s => s.StartTime).ToHashSet();
-        Assert.Contains(PolandTime(2026, 9, 1, 9, 0), starts);
-        Assert.Contains(PolandTime(2026, 9, 1, 12, 30), starts);
-        Assert.Contains(PolandTime(2026, 9, 1, 15, 30), starts);
-        Assert.Contains(PolandTime(2026, 9, 1, 21, 30), starts);
-
-        // Nothing floats in between - no slot starts strictly inside a window without touching an edge.
-        Assert.DoesNotContain(slots, s => s.StartTime == PolandTime(2026, 9, 1, 10, 30));
-    }
-
-    [Fact]
-    public async Task GetAvailableTimeSlotsAsync_GoogleCalendarBlock_TriggersEdgeModeJustLikeALocalBooking()
-    {
-        // No local booking, but a Google Calendar block occupies 12:00-13:00 - this alone must
-        // switch the day out of free-choice mode.
-        SetGoogleBusyPeriods((PolandTime(2026, 9, 1, 12, 0), PolandTime(2026, 9, 1, 13, 0)));
+        // Tuesday. Morning offers tileable starts up to 13:00 (whose blocks may run into the dead
+        // afternoon); 13:00-17:30 is dead; the evening offers the fixed first-group anchors.
         var calculator = CreateCalculator();
         var date = PolandTime(2026, 9, 1, 8, 0);
 
-        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S1)).ToList();
+        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        // If this were still free-choice (dense) mode, a 14-hour day minus a 1-hour block would
-        // offer far more than 4 candidates. Edge mode caps it to 2 per window (2 windows here).
-        Assert.Equal(4, slots.Count);
+        Assert.Equal(10, slots.Count);
+        // Morning tileable starts (<= 13:00), with orphaning ones dropped.
+        Assert.Contains(PolandTime(2026, 9, 1, 9, 0), starts);
+        Assert.Contains(PolandTime(2026, 9, 1, 10, 30), starts);
+        Assert.Contains(PolandTime(2026, 9, 1, 13, 0), starts);   // last morning start; block runs past 13:00
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 9, 30), starts); // orphaning morning start
+        // Evening anchors.
+        Assert.Contains(PolandTime(2026, 9, 1, 17, 30), starts);
+        Assert.Contains(PolandTime(2026, 9, 1, 18, 0), starts);
+        Assert.Contains(PolandTime(2026, 9, 1, 18, 30), starts);
+        Assert.Contains(PolandTime(2026, 9, 1, 19, 30), starts);
+        // Dead afternoon: no starts between 13:00 and 17:30.
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 14, 0), starts);
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 16, 0), starts);
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 17, 0), starts);
     }
 
     [Fact]
-    public async Task GetAvailableTimeSlotsAsync_WindowSmallerThanPackageDuration_OffersNothingForThatWindow()
+    public async Task GetAvailableTimeSlotsAsync_Weekday_EveningGroupExists_LaterGroupsStickFlush()
     {
-        // Booking occupies 09:00-22:00, leaving only a 60-minute window - too small for Max (120 min).
+        // An evening group already holds 17:30-19:00. The anchors are gone; the next group must stick
+        // flush (19:00), and nothing is offered before the 17:30 floor.
+        SetLocalBookings(LocalBooking(PolandTime(2026, 9, 1, 17, 30), 90));
+        var calculator = CreateCalculator();
+        var date = PolandTime(2026, 9, 1, 8, 0);
+
+        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
+
+        Assert.Contains(PolandTime(2026, 9, 1, 19, 0), starts);        // flush after the existing group
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 18, 0), starts);  // anchors no longer offered
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 19, 30), starts);
+        Assert.Contains(PolandTime(2026, 9, 1, 9, 0), starts);         // morning unaffected
+    }
+
+    [Fact]
+    public async Task GetAvailableTimeSlotsAsync_Weekday_MorningBookingDoesNotForceEveningToFlush()
+    {
+        // A morning group (09:00-10:30) must NOT push the evening into flush mode - the evening still
+        // offers its first-group anchors.
+        SetLocalBookings(LocalBooking(PolandTime(2026, 9, 1, 9, 0), 90));
+        var calculator = CreateCalculator();
+        var date = PolandTime(2026, 9, 1, 8, 0);
+
+        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
+
+        Assert.Contains(PolandTime(2026, 9, 1, 17, 30), starts); // evening still anchored
+        Assert.Contains(PolandTime(2026, 9, 1, 19, 30), starts);
+    }
+
+    [Fact]
+    public async Task GetAvailableTimeSlotsAsync_WhenTheDayIsFullyOccupied_ReturnsEmpty()
+    {
+        // A single booking spanning 09:00-22:00 leaves no room for either session.
         SetLocalBookings(LocalBooking(PolandTime(2026, 9, 1, 9, 0), 780));
         var calculator = CreateCalculator();
         var date = PolandTime(2026, 9, 1, 8, 0);
@@ -134,15 +142,54 @@ public class AvailabilityCalculatorTests
     }
 
     [Fact]
-    public async Task GetAvailableTimeSlotsAsync_SundayArenaHours_CloseAt16NotTheUsual23()
+    public async Task GetAvailableTimeSlotsAsync_Sunday_EmptyDay_FirstGroupAnchorsBetween0900And1200()
     {
-        // 2026-09-06 is a Sunday - close time should be 16:00, not the weekday 23:00.
+        // Sunday: the first group may start at any grid time 09:00-12:00 (free choice). Later times
+        // only open up by sticking flush once a group exists. Close is 16:00.
         var calculator = CreateCalculator();
         var date = PolandTime(2026, 9, 6, 10, 0);
 
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S1)).ToList();
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(PolandTime(2026, 9, 6, 14, 30), slots.Last().StartTime); // 16:00 - 90min
+        Assert.Equal(7, slots.Count); // 09:00, 09:30 ... 12:00
+        Assert.Equal(PolandTime(2026, 9, 6, 9, 0), slots.First().StartTime);
+        Assert.Equal(PolandTime(2026, 9, 6, 12, 0), slots.Last().StartTime);
+        Assert.Contains(PolandTime(2026, 9, 6, 10, 0), starts);        // free choice - not waste-filtered
+        Assert.DoesNotContain(PolandTime(2026, 9, 6, 12, 30), starts); // past the 12:00 anchor cutoff
+    }
+
+    [Fact]
+    public async Task GetAvailableTimeSlotsAsync_Sunday_WhenAGroupExists_LaterGroupsStickFlush()
+    {
+        // With a group already at 10:00-11:30, the anchors are gone; only flush starts remain (11:30),
+        // and flush-before (08:30) is rejected as it is before opening.
+        SetLocalBookings(LocalBooking(PolandTime(2026, 9, 6, 10, 0), 90));
+        var calculator = CreateCalculator();
+        var date = PolandTime(2026, 9, 6, 8, 0);
+
+        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S1)).ToList();
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
+
+        Assert.Contains(PolandTime(2026, 9, 6, 11, 30), starts);     // flush after
+        Assert.DoesNotContain(PolandTime(2026, 9, 6, 9, 0), starts); // anchors no longer offered
+        Assert.DoesNotContain(PolandTime(2026, 9, 6, 10, 0), starts);
+    }
+
+    [Fact]
+    public async Task GetAvailableTimeSlotsAsync_Saturday_UsesTileablePackingAllDay()
+    {
+        // Saturday keeps the all-day tileable packing - no anchors, no dead afternoon.
+        var calculator = CreateCalculator();
+        var date = PolandTime(2026, 8, 8, 10, 0);
+
+        var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
+
+        Assert.Equal(20, slots.Count);
+        Assert.Contains(PolandTime(2026, 8, 8, 10, 30), starts);      // tileable interior
+        Assert.Contains(PolandTime(2026, 8, 8, 14, 0), starts);       // afternoon is bookable on Saturday
+        Assert.DoesNotContain(PolandTime(2026, 8, 8, 9, 30), starts); // orphaning start dropped
     }
 
     [Fact]
@@ -173,9 +220,7 @@ public class AvailabilityCalculatorTests
     {
         // "now" fixed just before the Friday 22:00 Poland cutoff for the following Saturday.
         var friday10PM = PolandTime(2026, 8, 7, 21, 59);
-        var calculator = new AvailabilityCalculator(
-            _repository.Object, _googleCalendarService.Object, NullLogger<AvailabilityCalculator>.Instance,
-            new FakeTimeProvider(friday10PM));
+        var calculator = CreateCalculator(new FakeTimeProvider(friday10PM));
         var saturday = PolandTime(2026, 8, 8, 10, 0);
 
         Assert.True(calculator.IsOnlineBookingAllowed(saturday));
@@ -185,9 +230,7 @@ public class AvailabilityCalculatorTests
     public void IsOnlineBookingAllowed_Saturday_AfterFriday10PMCutoff_IsDenied()
     {
         var friday1001PM = PolandTime(2026, 8, 7, 22, 1);
-        var calculator = new AvailabilityCalculator(
-            _repository.Object, _googleCalendarService.Object, NullLogger<AvailabilityCalculator>.Instance,
-            new FakeTimeProvider(friday1001PM));
+        var calculator = CreateCalculator(new FakeTimeProvider(friday1001PM));
         var saturday = PolandTime(2026, 8, 8, 10, 0);
 
         Assert.False(calculator.IsOnlineBookingAllowed(saturday));
@@ -200,8 +243,7 @@ public class AvailabilityCalculatorTests
         // Midnight that day is still +1; 09:00 is already +2. The old bug computed arena open
         // time using midnight's offset, which would be an hour wrong here.
         var earlyMarch = new FakeTimeProvider(new DateTimeOffset(2027, 3, 1, 0, 0, 0, TimeSpan.Zero));
-        var calculator = new AvailabilityCalculator(
-            _repository.Object, _googleCalendarService.Object, NullLogger<AvailabilityCalculator>.Instance, earlyMarch);
+        var calculator = CreateCalculator(earlyMarch);
         var date = PolandTime(2027, 3, 28, 10, 0);
 
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S1)).ToList();
