@@ -23,7 +23,7 @@ public class SlotPackerTests
         int blocked,
         int client,
         params (DateTimeOffset Start, DateTimeOffset End)[] busy)
-        => _packer.Pack(Open, end, busy, blocked, client);
+        => _packer.PackTileable(Open, end, busy, blocked, client);
 
     [Fact]
     public void EmptyDay_OffersEveryGapFreeStart_AndNoOrphaningOne()
@@ -104,5 +104,60 @@ public class SlotPackerTests
         var morning = slots.Where(s => s.StartTime < At(12, 0)).Select(s => s.StartTime).ToHashSet();
 
         Assert.Equal(new HashSet<DateTimeOffset> { At(9, 0), At(10, 30) }, morning);
+    }
+
+    // ---- Anchored-then-flush (Sunday / weekday evening) ----
+
+    private static readonly DateTimeOffset[] EveningAnchors =
+        { At(17, 30), At(18, 0), At(18, 30), At(19, 30) };
+
+    [Fact]
+    public void AnchoredRegion_WhileEmpty_OffersEveryAnchorThatFits()
+    {
+        var slots = _packer.PackAnchoredThenFlush(
+            regionFloor: At(17, 30), regionEnd: At(23, 0), EveningAnchors,
+            regionHasGroup: false, NoBusy, packageBlockedDurationMinutes: 90, clientGameDurationMinutes: 50);
+
+        Assert.Equal(EveningAnchors.ToHashSet(), slots.Select(s => s.StartTime).ToHashSet());
+    }
+
+    [Fact]
+    public void AnchoredRegion_WhenAGroupExists_OffersFlushAfterButNotBelowTheFloor()
+    {
+        // First group took 17:30-19:00. The next must stick flush: 19:00 (after it). 16:00 (before it)
+        // is below the 17:30 floor and must not be offered.
+        var slots = _packer.PackAnchoredThenFlush(
+            regionFloor: At(17, 30), regionEnd: At(23, 0), EveningAnchors,
+            regionHasGroup: true, new[] { (At(17, 30), At(19, 0)) },
+            packageBlockedDurationMinutes: 90, clientGameDurationMinutes: 50);
+
+        Assert.Equal(new HashSet<DateTimeOffset> { At(19, 0) }, slots.Select(s => s.StartTime).ToHashSet());
+    }
+
+    [Fact]
+    public void AnchoredRegion_FlushBeforeAnExistingGroup_IsOfferedWhenAtOrAboveTheFloor()
+    {
+        // First group chose the 19:30 anchor (19:30-21:00). A 90-min group can flush in before it at
+        // 18:00 (>=17:30) and flush after it at 21:00.
+        var slots = _packer.PackAnchoredThenFlush(
+            regionFloor: At(17, 30), regionEnd: At(23, 0), EveningAnchors,
+            regionHasGroup: true, new[] { (At(19, 30), At(21, 0)) },
+            packageBlockedDurationMinutes: 90, clientGameDurationMinutes: 50);
+
+        Assert.Equal(
+            new HashSet<DateTimeOffset> { At(18, 0), At(21, 0) },
+            slots.Select(s => s.StartTime).ToHashSet());
+    }
+
+    [Fact]
+    public void AnchoredRegion_AnchorsThatWouldOverrunTheClose_AreExcluded()
+    {
+        // Region closes 20:00. A 120-min package can start at 18:00 (→20:00) but not 19:00 (→21:00).
+        var slots = _packer.PackAnchoredThenFlush(
+            regionFloor: At(17, 30), regionEnd: At(20, 0),
+            new[] { At(18, 0), At(19, 0) }, regionHasGroup: false, NoBusy,
+            packageBlockedDurationMinutes: 120, clientGameDurationMinutes: 80);
+
+        Assert.Equal(new HashSet<DateTimeOffset> { At(18, 0) }, slots.Select(s => s.StartTime).ToHashSet());
     }
 }

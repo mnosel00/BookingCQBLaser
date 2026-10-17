@@ -4,17 +4,20 @@ using BookingCQBLaser.Domain.Enums;
 namespace BookingCQBLaser.Application.Services;
 
 /// <summary>
-/// Waste-minimising packer. For each free window it offers every grid-aligned start whose leftover
-/// time — on both sides of the booking — can itself be fully filled by back-to-back bookings, so the
-/// day stays perfectly tileable while the customer keeps the widest choice that doesn't strand arena
-/// time. When a window can't be filled exactly (e.g. an odd 150-minute gap), it still offers the
-/// placements that strand the least.
+/// Provides the two packing strategies the arena uses.
+/// <para><see cref="PackTileable"/> is waste-minimising: for each free window it offers every
+/// grid-aligned start whose leftover on both sides can itself be filled by back-to-back bookings, so
+/// the day stays perfectly tileable while the customer keeps the widest choice that doesn't strand
+/// arena time; when a window can't tile exactly (e.g. a 150-min gap) it still offers the least-wasteful
+/// placements rather than nothing.</para>
+/// <para><see cref="PackAnchoredThenFlush"/> offers a fixed set of anchor starts while the region is
+/// empty, then flush-only starts once a group exists, so groups chain with no empty window.</para>
 /// </summary>
 /// <remarks>
 /// The arena books on a fixed grid and every package occupies a whole multiple of it (90 or 120 min),
 /// so whether a leftover gap is fully fillable is the classic coin-problem: a gap is fillable iff it
 /// is a sum of package durations. For {90,120} the only unfillable sizes at or above one package are
-/// 30, 60 and 150 minutes — those are exactly the leftovers this packer avoids creating.
+/// 30, 60 and 150 minutes — those are exactly the leftovers the tileable packer avoids creating.
 /// </remarks>
 public sealed class SlotPacker : ISlotPacker
 {
@@ -31,7 +34,7 @@ public sealed class SlotPacker : ISlotPacker
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
-    public IReadOnlyList<TimeSlotDto> Pack(
+    public IReadOnlyList<TimeSlotDto> PackTileable(
         DateTimeOffset dayStart,
         DateTimeOffset dayEnd,
         IReadOnlyList<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods,
@@ -48,6 +51,74 @@ public sealed class SlotPacker : ISlotPacker
         }
 
         return slots.OrderBy(s => s.StartTime).ToList();
+    }
+
+    public IReadOnlyList<TimeSlotDto> PackAnchoredThenFlush(
+        DateTimeOffset regionFloor,
+        DateTimeOffset regionEnd,
+        IReadOnlyList<DateTimeOffset> anchorStarts,
+        bool regionHasGroup,
+        IReadOnlyList<(DateTimeOffset Start, DateTimeOffset End)> busyPeriods,
+        int packageBlockedDurationMinutes,
+        int clientGameDurationMinutes)
+    {
+        var merged = MergeBusyPeriods(busyPeriods);
+
+        IEnumerable<DateTimeOffset> candidates;
+        if (!regionHasGroup)
+        {
+            // First group of the region: free choice among the allowed anchor starts.
+            candidates = anchorStarts;
+        }
+        else
+        {
+            // Every later group must stick flush to an existing booking - start exactly where one
+            // ends, or end exactly where one begins - so groups chain with no empty window between them.
+            var flush = new List<DateTimeOffset>();
+            foreach (var (start, end) in merged)
+            {
+                flush.Add(end);                                       // flush against the end of a booking
+                flush.Add(start.AddMinutes(-packageBlockedDurationMinutes)); // flush against the start of a booking
+            }
+            candidates = flush;
+        }
+
+        var slots = new List<TimeSlotDto>();
+        var seen = new HashSet<DateTimeOffset>();
+        foreach (var start in candidates.OrderBy(s => s))
+        {
+            var end = start.AddMinutes(packageBlockedDurationMinutes);
+
+            if (start < regionFloor) continue;        // never before the region floor (e.g. 17:30)
+            if (end > regionEnd) continue;            // must finish by the arena close
+            if (OverlapsAny(start, end, merged)) continue;
+            if (!seen.Add(start)) continue;
+
+            var maxAvailableDuration = (int)(NextBoundaryAfter(start, merged, regionEnd) - start).TotalMinutes;
+            slots.Add(new TimeSlotDto(start, start.AddMinutes(clientGameDurationMinutes), maxAvailableDuration));
+        }
+
+        return slots.OrderBy(s => s.StartTime).ToList();
+    }
+
+    private static bool OverlapsAny(
+        DateTimeOffset start,
+        DateTimeOffset end,
+        List<(DateTimeOffset Start, DateTimeOffset End)> merged)
+        => merged.Any(b => start < b.End && b.Start < end);
+
+    /// <summary>The next busy-period start strictly after <paramref name="start"/>, else the region end.</summary>
+    private static DateTimeOffset NextBoundaryAfter(
+        DateTimeOffset start,
+        List<(DateTimeOffset Start, DateTimeOffset End)> merged,
+        DateTimeOffset regionEnd)
+    {
+        var next = regionEnd;
+        foreach (var (busyStart, _) in merged)
+        {
+            if (busyStart > start && busyStart < next) next = busyStart;
+        }
+        return next;
     }
 
     /// <summary>

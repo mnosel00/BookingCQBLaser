@@ -21,6 +21,24 @@ public sealed class AvailabilityOptions
     /// <summary>Closing time on Sunday (the arena shuts earlier).</summary>
     public TimeOnly SundayCloseTime { get; init; } = new(16, 0);
 
+    /// <summary>
+    /// Latest start time for a Monday–Friday morning group (inclusive). The afternoon between this
+    /// and the evening session is dead (no new starts); a morning block may run past it.
+    /// </summary>
+    public TimeOnly MorningLatestStart { get; init; } = new(13, 0);
+
+    /// <summary>Earliest start of the Monday–Friday evening session; also its flush floor.</summary>
+    public TimeOnly EveningWindowStart { get; init; } = new(17, 30);
+
+    /// <summary>Latest grid start inside the evening anchor window (so anchors are 17:30 / 18:00 / 18:30).</summary>
+    public TimeOnly EveningWindowEnd { get; init; } = new(18, 30);
+
+    /// <summary>An extra discrete evening anchor outside the 17:30–18:30 window.</summary>
+    public TimeOnly EveningExtraAnchor { get; init; } = new(19, 30);
+
+    /// <summary>Latest start for the first Sunday group (inclusive); the day must open between open and this.</summary>
+    public TimeOnly SundayFirstStartLatest { get; init; } = new(12, 0);
+
     /// <summary>Minimum calendar days ahead a Monday–Friday booking must be made.</summary>
     public int WeekdayLeadTimeDays { get; init; } = 3;
 
