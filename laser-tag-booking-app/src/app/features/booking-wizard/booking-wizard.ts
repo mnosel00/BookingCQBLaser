@@ -213,6 +213,18 @@ export class BookingWizard {
     return buckets.filter(b => b.slots.length > 0);
   }
 
+  // compatibleSlotGroups rebuilds its group/slot wrapper objects on every change-detection pass,
+  // so without trackBy Angular would destroy and recreate every slot button each cycle - which
+  // drops a click when CD fires mid-click (e.g. the participant input blurring). Track by the
+  // stable slot start time / group label so the DOM is reused.
+  trackByGroupLabel(_index: number, group: { label: string }): string {
+    return group.label;
+  }
+
+  trackBySlotStart(_index: number, slot: TimeSlot): string | Date {
+    return slot.startTime;
+  }
+
   get selectedDateValue(): string {
     return typeof this.selectedDate === 'string'
       ? this.selectedDate

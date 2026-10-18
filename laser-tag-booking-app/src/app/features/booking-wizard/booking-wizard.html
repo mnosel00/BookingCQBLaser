@@ -159,10 +159,10 @@
       </div>
 
       <ng-container *ngIf="!isLoadingSlots && !slotsLoadError">
-        <div class="slot-group" *ngFor="let group of compatibleSlotGroups">
+        <div class="slot-group" *ngFor="let group of compatibleSlotGroups; trackBy: trackByGroupLabel">
           <h3 class="slot-group__title">{{ group.label }}</h3>
           <ul class="slots-list-grid">
-            <li *ngFor="let slot of group.slots">
+            <li *ngFor="let slot of group.slots; trackBy: trackBySlotStart">
               <button type="button" class="slot-tile" (click)="selectSlot(slot)">
                 <span class="slot-tile__start">{{ slot.startTime | date:'HH:mm' }}</span>
                 <span class="slot-tile__end">do {{ slot.endTime | date:'HH:mm' }}</span>
@@ -174,7 +174,7 @@
         <div *ngIf="availableSlotsIncompatible.length > 0" class="incompatible-slots-section">
           <p class="incompatible-slots-title">Dostępne terminy wymagające zmiany pakietu:</p>
           <ul class="slots-list-grid" style="margin-top: 0;">
-            <li *ngFor="let slot of availableSlotsIncompatible; let i = index" class="incompatible-slot-item">
+            <li *ngFor="let slot of availableSlotsIncompatible; let i = index; trackBy: trackBySlotStart" class="incompatible-slot-item">
               <button type="button" class="slot-tile slot-tile--incompatible" aria-disabled="true"
                 [attr.aria-describedby]="'incompatible-slot-reason-' + i">
                 <span class="slot-tile__start">{{ slot.startTime | date:'HH:mm' }}</span>
