@@ -14,7 +14,7 @@ namespace BookingCQBLaser.Domain.Enums
             {
                 PackageType.S1 => 90,
                 PackageType.S2 => 90,
-                PackageType.Premium => 90,
+                PackageType.Premium => 120,
                 PackageType.Max => 120,
                 PackageType.U1 => 120,
                 PackageType.U2 => 120,
