@@ -270,6 +270,33 @@ describe('BookingWizard', () => {
     });
   });
 
+  describe('going back from step 3 to step 2', () => {
+    it('wipes the guest details entered on step 3 (but keeps the step-2 participant count)', () => {
+      const component = createComponent();
+      component.selectPackage(PackageType.S1);
+      component.customerForm.get('participantsCount')?.setValue(10);
+      component.selectSlot(slot('2026-09-01T09:00:00+02:00', 90)); // -> step 3
+      expect(component.currentStep).toBe(3);
+
+      component.customerForm.patchValue({
+        firstName: 'Jan', lastName: 'Kowalski', email: 'jan@example.com', phone: '123456789', isAdultGroup: true,
+      });
+      component.hasOpenedTerms = true;
+
+      component.previousStep(); // back to step 2
+
+      expect(component.currentStep).toBe(2);
+      expect(component.customerForm.get('firstName')?.value).toBe('');
+      expect(component.customerForm.get('lastName')?.value).toBe('');
+      expect(component.customerForm.get('email')?.value).toBe('');
+      expect(component.customerForm.get('phone')?.value).toBe('');
+      expect(component.customerForm.get('isAdultGroup')?.value).toBe(false);
+      expect(component.hasOpenedTerms).toBe(false);
+      // participant count belongs to step 2 and is intentionally preserved
+      expect(component.customerForm.get('participantsCount')?.value).toBe(10);
+    });
+  });
+
   describe('summaryBarMode', () => {
     it('is hidden on step 1 (package comparison, no bar)', () => {
       const component = createComponent();

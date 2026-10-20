@@ -371,9 +371,32 @@ export class BookingWizard {
 
   previousStep(): void {
     if (this.currentStep > 1) {
+      // Leaving step 3 back to step 2 clears the guest details entered on step 3, so returning
+      // forward starts from a clean form instead of showing stale data.
+      if (this.currentStep === 3) {
+        this.resetGuestDetails();
+      }
       this.currentStep--;
       this.focusStepHeading(this.currentStep);
     }
+  }
+
+  // Resets everything entered on step 3 (name, contact, age group, consents) back to its initial
+  // state, including re-locking the terms checkbox until the terms are opened again.
+  private resetGuestDetails(): void {
+    const f = this.customerForm;
+    f.get('firstName')?.reset('');
+    f.get('lastName')?.reset('');
+    f.get('email')?.reset('');
+    f.get('phone')?.reset('');
+    f.get('ageRange')?.reset('');
+    f.get('isAdultGroup')?.reset(false); // valueChanges re-enables ageRange + its required validator
+    f.get('acceptLegal')?.reset(false);
+
+    const acceptTerms = f.get('acceptTerms');
+    acceptTerms?.reset(false);
+    acceptTerms?.disable();
+    this.hasOpenedTerms = false;
   }
 
   // Move keyboard/screen-reader focus to the heading of the step we just switched to. The
