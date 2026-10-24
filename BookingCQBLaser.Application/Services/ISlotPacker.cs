@@ -10,9 +10,9 @@ namespace BookingCQBLaser.Application.Services;
 public interface ISlotPacker
 {
     /// <summary>
-    /// Offers every grid-aligned start that physically fits in a free window, so the customer can book
-    /// any package at any available time even if it leaves an idle gap. Used for Saturday and weekday
-    /// mornings.
+    /// Offers every grid-aligned start that fits, except ones that would strand an unsellable break
+    /// (shorter than the shortest game) between the booking and an adjacent existing booking. Gaps at
+    /// the day's open/close are always allowed. Used for Saturday and weekday mornings.
     /// </summary>
     IReadOnlyList<TimeSlotDto> PackTileable(
         DateTimeOffset dayStart,
