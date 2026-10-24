@@ -67,22 +67,21 @@ public class AvailabilityCalculatorTests
     }
 
     [Fact]
-    public async Task GetAvailableTimeSlotsAsync_Weekday_EmptyDay_MorningTileableStartsPlusEveningAnchors()
+    public async Task GetAvailableTimeSlotsAsync_Weekday_EmptyDay_EveryMorningStartPlusEveningAnchors()
     {
-        // Tuesday. Morning offers tileable starts up to 13:00 (whose blocks may run into the dead
-        // afternoon); 13:00-17:30 is dead; the evening offers the fixed first-group anchors.
+        // Tuesday. Morning offers every 30-min start up to 13:00 (09:00..13:00 = 9), whose blocks may
+        // run into the dead afternoon; 13:00-17:30 is dead; the evening offers the 4 first-group anchors.
         var calculator = CreateCalculator();
         var date = PolandTime(2026, 9, 1, 8, 0);
 
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
         var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(10, slots.Count);
-        // Morning tileable starts (<= 13:00), with orphaning ones dropped.
+        Assert.Equal(13, slots.Count); // 9 morning + 4 evening anchors
+        // Every morning start <= 13:00 is offered, including ones that leave an idle gap.
         Assert.Contains(PolandTime(2026, 9, 1, 9, 0), starts);
-        Assert.Contains(PolandTime(2026, 9, 1, 10, 30), starts);
+        Assert.Contains(PolandTime(2026, 9, 1, 9, 30), starts);
         Assert.Contains(PolandTime(2026, 9, 1, 13, 0), starts);   // last morning start; block runs past 13:00
-        Assert.DoesNotContain(PolandTime(2026, 9, 1, 9, 30), starts); // orphaning morning start
         // Evening anchors.
         Assert.Contains(PolandTime(2026, 9, 1, 17, 30), starts);
         Assert.Contains(PolandTime(2026, 9, 1, 18, 0), starts);
@@ -186,10 +185,9 @@ public class AvailabilityCalculatorTests
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
         var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(20, slots.Count);
-        Assert.Contains(PolandTime(2026, 8, 8, 10, 30), starts);      // tileable interior
-        Assert.Contains(PolandTime(2026, 8, 8, 14, 0), starts);       // afternoon is bookable on Saturday
-        Assert.DoesNotContain(PolandTime(2026, 8, 8, 9, 30), starts); // orphaning start dropped
+        Assert.Equal(26, slots.Count);                           // every 30-min start 09:00..21:30
+        Assert.Contains(PolandTime(2026, 8, 8, 9, 30), starts);  // offered even though it leaves a gap
+        Assert.Contains(PolandTime(2026, 8, 8, 14, 0), starts);  // afternoon is bookable on Saturday
     }
 
     [Fact]
