@@ -77,10 +77,11 @@ public class AvailabilityCalculatorTests
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
         var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(13, slots.Count); // 9 morning + 4 evening anchors
-        // Every morning start <= 13:00 is offered, including ones that leave an idle gap.
+        Assert.Equal(9, slots.Count); // 5 full-hour morning starts (09:00..13:00) + 4 evening anchors
+        // Morning offers full hours up to 13:00; a half-hour like 09:30 only appears flush to a booking.
         Assert.Contains(PolandTime(2026, 9, 1, 9, 0), starts);
-        Assert.Contains(PolandTime(2026, 9, 1, 9, 30), starts);
+        Assert.Contains(PolandTime(2026, 9, 1, 10, 0), starts);
+        Assert.DoesNotContain(PolandTime(2026, 9, 1, 9, 30), starts);
         Assert.Contains(PolandTime(2026, 9, 1, 13, 0), starts);   // last morning start; block runs past 13:00
         // Evening anchors.
         Assert.Contains(PolandTime(2026, 9, 1, 17, 30), starts);
@@ -185,9 +186,10 @@ public class AvailabilityCalculatorTests
         var slots = (await calculator.GetAvailableTimeSlotsAsync(date, PackageType.S2)).ToList();
         var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(26, slots.Count);                           // every 30-min start 09:00..21:30
-        Assert.Contains(PolandTime(2026, 8, 8, 9, 30), starts);  // offered even though it leaves a gap
-        Assert.Contains(PolandTime(2026, 8, 8, 14, 0), starts);  // afternoon is bookable on Saturday
+        Assert.Equal(13, slots.Count);                              // full hours 09:00..21:00
+        Assert.Contains(PolandTime(2026, 8, 8, 14, 0), starts);     // afternoon is bookable on Saturday
+        Assert.DoesNotContain(PolandTime(2026, 8, 8, 9, 30), starts); // half-hour, not flush -> not offered
+        Assert.DoesNotContain(PolandTime(2026, 8, 8, 21, 30), starts); // last start is 21:00
     }
 
     [Fact]

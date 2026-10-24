@@ -26,21 +26,20 @@ public class SlotPackerTests
         => _packer.PackTileable(Open, end, busy, blocked, client);
 
     [Fact]
-    public void EmptyDay_OffersEveryGridStartThatFits()
+    public void EmptyDay_OffersFullHoursOnly()
     {
-        // 09:00-23:00 = 840 min, 90-min package: every 30-min start from 09:00 to 21:30 = 26.
+        // Empty day -> full hours 09:00..21:00 (13). No half-hours, because none is flush to a booking.
         var slots = Pack(At(23, 0), blocked: 90, client: 50, NoBusy);
         var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(26, slots.Count);
+        Assert.Equal(13, slots.Count);
         Assert.Equal(At(9, 0), slots.First().StartTime);
-        Assert.Equal(At(21, 30), slots.Last().StartTime);
-        // MaxAvailableDurationMinutes is the bookable game length (the 90-min package here), not room.
-        Assert.All(slots, s => Assert.Equal(90, s.MaxAvailableDurationMinutes));
-        // Starts that leave an idle gap are offered too - choice beats zero idle minutes.
-        Assert.Contains(At(9, 30), starts);
+        Assert.Equal(At(21, 0), slots.Last().StartTime);
+        Assert.All(slots, s => Assert.Equal(0, s.StartTime.Minute));          // every start is on the hour
+        Assert.All(slots, s => Assert.Equal(90, s.MaxAvailableDurationMinutes)); // bookable game length
         Assert.Contains(At(10, 0), starts);
-        Assert.Contains(At(11, 30), starts);
+        Assert.DoesNotContain(At(9, 30), starts);
+        Assert.DoesNotContain(At(21, 30), starts);
     }
 
     [Fact]
@@ -62,16 +61,17 @@ public class SlotPackerTests
     }
 
     [Fact]
-    public void NearClose_WhereOnlyAShorterGameFits_OffersADowngradeSlot()
+    public void NearClose_FullHourWhereOnlyAShorterGameFits_OffersADowngradeSlot()
     {
-        // 150-min window (09:00-11:30) for a 120-min package. 09:00/09:30 fit the full game; at 10:00
-        // only a 90-min game still fits before close, so it's offered as a downgrade (MaxAvail = 90).
+        // 150-min window (09:00-11:30), 120-min package. 09:00 fits the full 2h game; the 10:00 full
+        // hour only fits a 1.5h game before close -> downgrade (MaxAvail = 90). 09:30 is a half-hour
+        // with no booking next to it, so it isn't offered.
         var slots = Pack(At(11, 30), blocked: 120, client: 80, NoBusy);
         var byStart = slots.ToDictionary(s => s.StartTime, s => s.MaxAvailableDurationMinutes);
 
         Assert.Equal(120, byStart[At(9, 0)]);
-        Assert.Equal(120, byStart[At(9, 30)]);
-        Assert.Equal(90, byStart[At(10, 0)]); // downgrade: only a 1.5h game fits here
+        Assert.Equal(90, byStart[At(10, 0)]);
+        Assert.DoesNotContain(At(9, 30), byStart.Keys);
     }
 
     [Fact]
@@ -96,9 +96,10 @@ public class SlotPackerTests
 
         // First window: 10:00 leaves 120 min before the 14:00 booking (sellable) -> offered.
         Assert.Contains(At(10, 0), starts);
-        Assert.Contains(At(12, 30), starts);      // flush to the 14:00 booking
+        Assert.Contains(At(12, 30), starts);      // half-hour, but flush to the 14:00 booking -> offered
+        Assert.DoesNotContain(At(10, 30), starts); // half-hour, not flush -> not offered
         Assert.DoesNotContain(At(12, 0), starts); // would leave a 30-min dead break before 14:00
-        Assert.DoesNotContain(At(11, 30), starts); // would leave a 60-min dead break before 14:00
+        Assert.DoesNotContain(At(11, 30), starts); // half-hour and would leave a dead break
         // Second window: 16:00 would leave a 30-min dead break after the booking ends (15:30) -> no.
         Assert.Contains(At(15, 30), starts);      // flush after the booking
         Assert.DoesNotContain(At(16, 0), starts);
@@ -142,6 +143,22 @@ public class SlotPackerTests
         var morning = slots.Where(s => s.StartTime < At(12, 0)).Select(s => s.StartTime).ToHashSet();
 
         Assert.Equal(new HashSet<DateTimeOffset> { At(9, 0), At(10, 30) }, morning);
+    }
+
+    [Fact]
+    public void HalfHourStart_OnlyAppearsFlushAfterA90MinBooking()
+    {
+        // A 1.5h game booked 09:00-10:30. The next start flushes onto its :30 end; the 11:00 full hour
+        // would leave a 30-min dead break; 12:00 onward are the usual full hours. 11:30 (a non-flush
+        // half-hour) is never offered.
+        var slots = Pack(At(23, 0), blocked: 120, client: 110, (At(9, 0), At(10, 30)));
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
+
+        Assert.Contains(At(10, 30), starts);       // flush after the 1.5h booking (half-hour)
+        Assert.DoesNotContain(At(11, 0), starts);  // would leave a 30-min dead break
+        Assert.DoesNotContain(At(11, 30), starts); // half-hour, not flush
+        Assert.Contains(At(12, 0), starts);        // back on full hours
+        Assert.Contains(At(13, 0), starts);
     }
 
     // ---- Anchored-then-flush (Sunday / weekday evening) ----

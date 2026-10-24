@@ -10,11 +10,12 @@ namespace BookingCQBLaser.Application.Services;
 public interface ISlotPacker
 {
     /// <summary>
-    /// Offers every grid-aligned start that fits, except ones that would strand an unsellable break
-    /// (shorter than the shortest game) between the booking and an adjacent existing booking. Gaps at
-    /// the day's open/close are always allowed. Each slot's <c>MaxAvailableDurationMinutes</c> is the
-    /// longest game bookable there up to the selected package, so a start where only a shorter game
-    /// fits is still returned (a downgrade slot). Used for Saturday and weekday mornings.
+    /// Offers full-hour starts; a half-hour start is offered only when it sits flush to an existing
+    /// booking (after a 1.5h game shifts the grid). Also drops starts that would strand an unsellable
+    /// break next to a booking; gaps at the day's open/close are always allowed. Each slot's
+    /// <c>MaxAvailableDurationMinutes</c> is the longest game bookable there up to the selected package,
+    /// so a start where only a shorter game fits is still returned (a downgrade slot). Used for Saturday
+    /// and weekday mornings.
     /// </summary>
     IReadOnlyList<TimeSlotDto> PackTileable(
         DateTimeOffset dayStart,
