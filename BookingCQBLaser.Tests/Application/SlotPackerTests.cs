@@ -73,16 +73,36 @@ public class SlotPackerTests
     }
 
     [Fact]
-    public void BusyPeriodSplitsTheDay_EveryFittingStartOfferedInEachWindow()
+    public void BusyPeriodSplitsTheDay_SmallDeadBreakNextToTheBookingIsNotOffered()
     {
         // Busy 14:00-15:30 → windows [09:00,14:00)=300 and [15:30,23:00)=450.
         var slots = Pack(At(23, 0), blocked: 90, client: 50, (At(14, 0), At(15, 30)));
         var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Contains(At(10, 0), starts);       // offered even though it leaves a 30-min gap before 14:00
-        Assert.Contains(At(12, 30), starts);      // last fit in the first window (12:30+90 = 14:00)
-        Assert.Contains(At(15, 30), starts);      // start of the second window
-        Assert.DoesNotContain(At(13, 0), starts); // doesn't fit before 14:00 (13:00+90 = 14:30)
+        // First window: 10:00 leaves 120 min before the 14:00 booking (sellable) -> offered.
+        Assert.Contains(At(10, 0), starts);
+        Assert.Contains(At(12, 30), starts);      // flush to the 14:00 booking
+        Assert.DoesNotContain(At(12, 0), starts); // would leave a 30-min dead break before 14:00
+        Assert.DoesNotContain(At(11, 30), starts); // would leave a 60-min dead break before 14:00
+        // Second window: 16:00 would leave a 30-min dead break after the booking ends (15:30) -> no.
+        Assert.Contains(At(15, 30), starts);      // flush after the booking
+        Assert.DoesNotContain(At(16, 0), starts);
+        Assert.Contains(At(17, 0), starts);       // leaves 90 min after the booking (sellable)
+    }
+
+    [Fact]
+    public void TheUserScenarios_Combat10amAllowed_But5pmDeadBreakBlocked()
+    {
+        // Existing booking 14:00-16:00 (a 2h game). Open 09:00, close 23:00.
+        var slots = Pack(At(23, 0), blocked: 120, client: 110, (At(14, 0), At(16, 0)));
+        var starts = slots.Select(s => s.StartTime).ToHashSet();
+
+        // Combat at 10:00 (10:00-12:00) leaves 12:00-14:00 = 120 min before the booking (sellable).
+        Assert.Contains(At(10, 0), starts);
+        // 17:00 would leave 16:00-17:00 = 60 min dead after the booking -> blocked.
+        Assert.DoesNotContain(At(17, 0), starts);
+        Assert.Contains(At(16, 0), starts); // flush after the booking
+        Assert.Contains(At(18, 0), starts); // leaves 120 min after the booking (sellable)
     }
 
     [Fact]
@@ -100,12 +120,13 @@ public class SlotPackerTests
     public void OverlappingBusyPeriods_AreMergedBeforePacking()
     {
         // Two overlapping blocks 12:00-13:00 and 12:30-14:00 collapse to one 12:00-14:00 busy period,
-        // so the morning window is [09:00,12:00)=180 → every fitting 90-min start 09:00..10:30.
+        // so the morning window is [09:00,12:00)=180. 09:00 leaves a sellable 90 before the booking and
+        // 10:30 is flush to it; 09:30/10:00 would strand a 60/30-min dead break, so they're dropped.
         var slots = Pack(At(23, 0), blocked: 90, client: 50,
             (At(12, 0), At(13, 0)), (At(12, 30), At(14, 0)));
         var morning = slots.Where(s => s.StartTime < At(12, 0)).Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(new HashSet<DateTimeOffset> { At(9, 0), At(9, 30), At(10, 0), At(10, 30) }, morning);
+        Assert.Equal(new HashSet<DateTimeOffset> { At(9, 0), At(10, 30) }, morning);
     }
 
     // ---- Anchored-then-flush (Sunday / weekday evening) ----

@@ -1,17 +1,25 @@
 using BookingCQBLaser.Application.DTOs;
+using BookingCQBLaser.Domain.Enums;
 
 namespace BookingCQBLaser.Application.Services;
 
 /// <summary>
 /// Provides the two packing strategies the arena uses.
-/// <para><see cref="PackTileable"/> offers every grid-aligned start that physically fits in a free
-/// window, so the customer can book any package at any available time even if it leaves an idle gap.</para>
+/// <para><see cref="PackTileable"/> offers every grid-aligned start that fits, except ones that would
+/// leave an unsellable dead break next to an existing booking: a booking may sit flush against another,
+/// or leave a gap big enough to still sell a game, but never a small gap (shorter than the shortest
+/// game) between it and a neighbour. Gaps against the day's open/close don't count.</para>
 /// <para><see cref="PackAnchoredThenFlush"/> offers a fixed set of anchor starts while the region is
 /// empty, then flush-only starts once a group exists, so groups chain with no empty window.</para>
 /// </summary>
 public sealed class SlotPacker : ISlotPacker
 {
     private readonly AvailabilityOptions _options;
+
+    // The shortest game any package books. A gap smaller than this can never be sold, so the packer
+    // won't leave one between two bookings. Derived from the package table.
+    private static readonly int MinGameMinutes =
+        Enum.GetValues<PackageType>().Select(p => p.GetBaseDurationMinutes()).Min();
 
     public SlotPacker(AvailabilityOptions options)
     {
@@ -31,7 +39,12 @@ public sealed class SlotPacker : ISlotPacker
         var slots = new List<TimeSlotDto>();
         foreach (var (windowStart, windowEnd) in freeWindows)
         {
-            slots.AddRange(PackWindow(windowStart, windowEnd, packageBlockedDurationMinutes, clientGameDurationMinutes));
+            // A window edge that is a day boundary (open/close) allows any gap; an edge that is an
+            // existing booking must not be left with a small, unsellable break.
+            var leftBoundedByBooking = windowStart != dayStart;
+            var rightBoundedByBooking = windowEnd != dayEnd;
+            slots.AddRange(PackWindow(windowStart, windowEnd, packageBlockedDurationMinutes, clientGameDurationMinutes,
+                leftBoundedByBooking, rightBoundedByBooking));
         }
 
         return slots.OrderBy(s => s.StartTime).ToList();
@@ -106,22 +119,31 @@ public sealed class SlotPacker : ISlotPacker
     }
 
     /// <summary>
-    /// Offers every grid-aligned start in a free window that leaves room for the package's blocked
-    /// duration. The customer may book any package at any time that physically fits, even if it leaves
-    /// an idle gap - selling the booking the customer actually wants (e.g. the high-margin Combat at
-    /// their preferred hour) matters more than squeezing out every idle minute.
+    /// Offers every grid-aligned start that fits, except those that would strand an unsellable break
+    /// (shorter than the shortest game) between this booking and an adjacent existing booking. A gap
+    /// against a day boundary (open/close) is always allowed; a gap next to a booking must be zero
+    /// (flush) or at least one game long.
     /// </summary>
     private List<TimeSlotDto> PackWindow(
         DateTimeOffset windowStart,
         DateTimeOffset windowEnd,
         int packageBlockedDuration,
-        int clientGameDuration)
+        int clientGameDuration,
+        bool leftBoundedByBooking,
+        bool rightBoundedByBooking)
     {
         var interval = _options.SlotIntervalMinutes;
         var slots = new List<TimeSlotDto>();
 
         for (var start = windowStart; start.AddMinutes(packageBlockedDuration) <= windowEnd; start = start.AddMinutes(interval))
         {
+            var leftGap = (int)(start - windowStart).TotalMinutes;
+            var rightGap = (int)(windowEnd - start).TotalMinutes - packageBlockedDuration;
+
+            // Never leave a small dead break next to an existing booking (gaps at the day's edges are fine).
+            if (leftBoundedByBooking && leftGap != 0 && leftGap < MinGameMinutes) continue;
+            if (rightBoundedByBooking && rightGap != 0 && rightGap < MinGameMinutes) continue;
+
             var maxAvailableDuration = (int)(windowEnd - start).TotalMinutes;
             slots.Add(new TimeSlotDto(start, start.AddMinutes(clientGameDuration), maxAvailableDuration));
         }
