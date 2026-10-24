@@ -5,12 +5,14 @@ namespace BookingCQBLaser.Application.Services;
 
 /// <summary>
 /// Provides the two packing strategies the arena uses.
-/// <para><see cref="PackTileable"/> offers every grid-aligned start that fits, except ones that would
-/// leave an unsellable dead break next to an existing booking (a gap shorter than the shortest game;
-/// flush or a sellable gap is fine, and gaps at the day's open/close don't count). Each slot's
-/// <c>MaxAvailableDurationMinutes</c> is the longest game bookable at that start up to the selected
-/// package - equal to it on a normal slot, or a shorter game on a "downgrade" slot where only a smaller
-/// package fits, which the front end surfaces as "available with a smaller package".</para>
+/// <para><see cref="PackTileable"/> offers full-hour starts (09:00, 10:00, …); a half-hour start is
+/// offered only when it sits flush to an existing booking (which happens once a 1.5h game shifts the
+/// grid by 30 min). It also drops starts that would leave an unsellable dead break next to a booking
+/// (a gap shorter than the shortest game; flush or a sellable gap is fine, and gaps at the day's
+/// open/close don't count). Each slot's <c>MaxAvailableDurationMinutes</c> is the longest game bookable
+/// at that start up to the selected package - equal to it on a normal slot, or a shorter game on a
+/// "downgrade" slot where only a smaller package fits, which the front end surfaces as "available with
+/// a smaller package".</para>
 /// <para><see cref="PackAnchoredThenFlush"/> offers a fixed set of anchor starts while the region is
 /// empty, then flush-only starts once a group exists, so groups chain with no empty window.</para>
 /// </summary>
@@ -63,6 +65,14 @@ public sealed class SlotPacker : ISlotPacker
                 // the front end can show "available with a smaller package" rather than hiding it.
                 var bookable = LargestBookableDuration(start, windowEnd, packageBlockedDurationMinutes, rightBoundedByBooking);
                 if (bookable == 0) continue;
+
+                // Keep the schedule on full hours. A half-hour start is only offered when it sits flush
+                // to an existing booking - which is exactly what happens once a 1.5h game shifts the grid
+                // by 30 minutes (the next group flushes onto its :30 end, or flushes :30 before a booking).
+                var onTheHour = start.Minute == 0;
+                var flushAfterBooking = leftBoundedByBooking && leftGap == 0;
+                var flushBeforeBooking = rightBoundedByBooking && (int)(windowEnd - start).TotalMinutes == bookable;
+                if (!onTheHour && !flushAfterBooking && !flushBeforeBooking) continue;
 
                 slots.Add(new TimeSlotDto(start, start.AddMinutes(clientGameDurationMinutes), bookable));
             }
