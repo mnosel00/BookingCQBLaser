@@ -1,33 +1,17 @@
 using BookingCQBLaser.Application.DTOs;
-using BookingCQBLaser.Domain.Enums;
 
 namespace BookingCQBLaser.Application.Services;
 
 /// <summary>
 /// Provides the two packing strategies the arena uses.
-/// <para><see cref="PackTileable"/> is waste-minimising: for each free window it offers every
-/// grid-aligned start whose leftover on both sides can itself be filled by back-to-back bookings, so
-/// the day stays perfectly tileable while the customer keeps the widest choice that doesn't strand
-/// arena time; when a window can't tile exactly (e.g. a 150-min gap) it still offers the least-wasteful
-/// placements rather than nothing.</para>
+/// <para><see cref="PackTileable"/> offers every grid-aligned start that physically fits in a free
+/// window, so the customer can book any package at any available time even if it leaves an idle gap.</para>
 /// <para><see cref="PackAnchoredThenFlush"/> offers a fixed set of anchor starts while the region is
 /// empty, then flush-only starts once a group exists, so groups chain with no empty window.</para>
 /// </summary>
-/// <remarks>
-/// The arena books on a fixed grid and every package occupies a whole multiple of it (90 or 120 min),
-/// so whether a leftover gap is fully fillable is the classic coin-problem: a gap is fillable iff it
-/// is a sum of package durations. For {90,120} the only unfillable sizes at or above one package are
-/// 30, 60 and 150 minutes — those are exactly the leftovers the tileable packer avoids creating.
-/// </remarks>
 public sealed class SlotPacker : ISlotPacker
 {
     private readonly AvailabilityOptions _options;
-
-    // The distinct arena-occupancy durations any package can take — the "coins" for deciding whether
-    // a leftover gap can be filled exactly. Derived from the package table so it stays correct if the
-    // packages change.
-    private static readonly int[] BlockedDurationsMinutes =
-        Enum.GetValues<PackageType>().Select(p => p.GetBaseDurationMinutes()).Distinct().OrderBy(d => d).ToArray();
 
     public SlotPacker(AvailabilityOptions options)
     {
@@ -122,10 +106,10 @@ public sealed class SlotPacker : ISlotPacker
     }
 
     /// <summary>
-    /// Offers, for one free window, the grid-aligned starts that strand the least arena time. On a
-    /// window that tiles exactly those are every start whose both leftovers are fully fillable (waste
-    /// zero); on a window that can't tile exactly, the least-wasteful starts are offered rather than
-    /// none, so an awkward gap still yields a bookable slot.
+    /// Offers every grid-aligned start in a free window that leaves room for the package's blocked
+    /// duration. The customer may book any package at any time that physically fits, even if it leaves
+    /// an idle gap - selling the booking the customer actually wants (e.g. the high-margin Combat at
+    /// their preferred hour) matters more than squeezing out every idle minute.
     /// </summary>
     private List<TimeSlotDto> PackWindow(
         DateTimeOffset windowStart,
@@ -134,82 +118,15 @@ public sealed class SlotPacker : ISlotPacker
         int clientGameDuration)
     {
         var interval = _options.SlotIntervalMinutes;
-        var windowMinutes = (int)(windowEnd - windowStart).TotalMinutes;
+        var slots = new List<TimeSlotDto>();
 
-        if (windowMinutes < packageBlockedDuration)
-        {
-            return new List<TimeSlotDto>();
-        }
-
-        // Every grid-aligned start that still leaves room for the package's blocked duration, with
-        // the arena time it would strand (unfillable leftover before + after the booking).
-        var candidates = new List<(DateTimeOffset Start, int Waste)>();
         for (var start = windowStart; start.AddMinutes(packageBlockedDuration) <= windowEnd; start = start.AddMinutes(interval))
         {
-            var before = (int)(start - windowStart).TotalMinutes;
-            var after = (int)(windowEnd - start).TotalMinutes - packageBlockedDuration;
-            candidates.Add((start, StrandedMinutes(before) + StrandedMinutes(after)));
-        }
-
-        var minWaste = candidates.Min(c => c.Waste);
-
-        var slots = new List<TimeSlotDto>();
-        foreach (var (start, waste) in candidates)
-        {
-            if (waste != minWaste) continue;
-
             var maxAvailableDuration = (int)(windowEnd - start).TotalMinutes;
             slots.Add(new TimeSlotDto(start, start.AddMinutes(clientGameDuration), maxAvailableDuration));
         }
 
         return slots;
-    }
-
-    /// <summary>
-    /// Arena minutes that would be stranded by a leftover gap of <paramref name="gapMinutes"/> — the
-    /// gap minus the most it can be filled with back-to-back bookings. Zero when the gap tiles exactly
-    /// (including an empty gap). Solved as the coin problem over the package durations.
-    /// </summary>
-    private int StrandedMinutes(int gapMinutes)
-    {
-        if (gapMinutes <= 0) return 0;
-
-        var interval = _options.SlotIntervalMinutes;
-
-        // Anything below the grid can never be booked, so it is stranded outright.
-        var gapUnits = gapMinutes / interval;
-        var subGridRemainder = gapMinutes - gapUnits * interval;
-
-        // Package durations in grid units (they are whole multiples of the grid).
-        var coins = BlockedDurationsMinutes
-            .Where(d => d % interval == 0)
-            .Select(d => d / interval)
-            .Where(u => u > 0)
-            .Distinct()
-            .ToArray();
-
-        // reachable[x] == can x grid-units be formed exactly by summing package durations.
-        var reachable = new bool[gapUnits + 1];
-        reachable[0] = true;
-        for (var x = 1; x <= gapUnits; x++)
-        {
-            foreach (var coin in coins)
-            {
-                if (x - coin >= 0 && reachable[x - coin])
-                {
-                    reachable[x] = true;
-                    break;
-                }
-            }
-        }
-
-        var largestFillableUnits = 0;
-        for (var x = gapUnits; x >= 0; x--)
-        {
-            if (reachable[x]) { largestFillableUnits = x; break; }
-        }
-
-        return subGridRemainder + (gapUnits - largestFillableUnits) * interval;
     }
 
     private static List<(DateTimeOffset Start, DateTimeOffset End)> GetFreeWindows(

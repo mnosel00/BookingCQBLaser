@@ -26,19 +26,21 @@ public class SlotPackerTests
         => _packer.PackTileable(Open, end, busy, blocked, client);
 
     [Fact]
-    public void EmptyDay_OffersEveryGapFreeStart_AndNoOrphaningOne()
+    public void EmptyDay_OffersEveryGridStartThatFits()
     {
-        // 09:00-23:00 = 840 min, 90-min package. 20 of the 26 grid starts tile cleanly.
+        // 09:00-23:00 = 840 min, 90-min package: every 30-min start from 09:00 to 21:30 = 26.
         var slots = Pack(At(23, 0), blocked: 90, client: 50, NoBusy);
         var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(20, slots.Count);
-        Assert.Contains(At(9, 0), starts);
-        Assert.Contains(At(10, 30), starts);  // interior, tiles 90|...
-        Assert.Contains(At(21, 30), starts);  // flush end
-        Assert.DoesNotContain(At(9, 30), starts);   // would strand 30 before
-        Assert.DoesNotContain(At(10, 0), starts);   // would strand 60 before
-        Assert.DoesNotContain(At(11, 30), starts);  // would strand 150 (unfillable) before
+        Assert.Equal(26, slots.Count);
+        Assert.Equal(At(9, 0), slots.First().StartTime);
+        Assert.Equal(At(21, 30), slots.Last().StartTime);
+        Assert.Equal(840, slots.First().MaxAvailableDurationMinutes);
+        Assert.Equal(90, slots.Last().MaxAvailableDurationMinutes);
+        // Starts that leave an idle gap are offered too - choice beats zero idle minutes.
+        Assert.Contains(At(9, 30), starts);
+        Assert.Contains(At(10, 0), starts);
+        Assert.Contains(At(11, 30), starts);
     }
 
     [Fact]
@@ -60,27 +62,27 @@ public class SlotPackerTests
     }
 
     [Fact]
-    public void Awkward150MinuteWindow_StillOffersLeastWastefulStarts()
+    public void AllFittingGridStartsOffered_EvenWhenTheyLeaveAGap()
     {
-        // 150 can't be tiled exactly by 120; every placement strands 30, so offer them rather than
-        // refusing the window.
-        var slots = Pack(At(11, 30), blocked: 120, client: 80, NoBusy); // 150-min window
+        // 150-min window, 120-min package: 09:00 and 09:30 both fit (each leaves 30 min idle).
+        var slots = Pack(At(11, 30), blocked: 120, client: 80, NoBusy);
 
-        Assert.NotEmpty(slots);
-        Assert.All(slots, s => Assert.True(s.StartTime >= At(9, 0) && s.StartTime <= At(9, 30)));
+        Assert.Equal(
+            new HashSet<DateTimeOffset> { At(9, 0), At(9, 30) },
+            slots.Select(s => s.StartTime).ToHashSet());
     }
 
     [Fact]
-    public void BusyPeriodSplitsTheDay_InteriorTileableStartsOfferedInEachWindow()
+    public void BusyPeriodSplitsTheDay_EveryFittingStartOfferedInEachWindow()
     {
         // Busy 14:00-15:30 → windows [09:00,14:00)=300 and [15:30,23:00)=450.
         var slots = Pack(At(23, 0), blocked: 90, client: 50, (At(14, 0), At(15, 30)));
         var starts = slots.Select(s => s.StartTime).ToHashSet();
 
-        Assert.Contains(At(10, 30), starts); // interior of first window
-        Assert.Contains(At(11, 0), starts);  // interior of first window
-        Assert.DoesNotContain(At(10, 0), starts); // would strand 60
-        Assert.Contains(At(15, 30), starts); // flush start of second window
+        Assert.Contains(At(10, 0), starts);       // offered even though it leaves a 30-min gap before 14:00
+        Assert.Contains(At(12, 30), starts);      // last fit in the first window (12:30+90 = 14:00)
+        Assert.Contains(At(15, 30), starts);      // start of the second window
+        Assert.DoesNotContain(At(13, 0), starts); // doesn't fit before 14:00 (13:00+90 = 14:30)
     }
 
     [Fact]
@@ -98,12 +100,12 @@ public class SlotPackerTests
     public void OverlappingBusyPeriods_AreMergedBeforePacking()
     {
         // Two overlapping blocks 12:00-13:00 and 12:30-14:00 collapse to one 12:00-14:00 busy period,
-        // so the morning window is [09:00,12:00)=180 → tiles as 90|90, offering 09:00 and 10:30.
+        // so the morning window is [09:00,12:00)=180 → every fitting 90-min start 09:00..10:30.
         var slots = Pack(At(23, 0), blocked: 90, client: 50,
             (At(12, 0), At(13, 0)), (At(12, 30), At(14, 0)));
         var morning = slots.Where(s => s.StartTime < At(12, 0)).Select(s => s.StartTime).ToHashSet();
 
-        Assert.Equal(new HashSet<DateTimeOffset> { At(9, 0), At(10, 30) }, morning);
+        Assert.Equal(new HashSet<DateTimeOffset> { At(9, 0), At(9, 30), At(10, 0), At(10, 30) }, morning);
     }
 
     // ---- Anchored-then-flush (Sunday / weekday evening) ----
