@@ -35,8 +35,8 @@ public class SlotPackerTests
         Assert.Equal(26, slots.Count);
         Assert.Equal(At(9, 0), slots.First().StartTime);
         Assert.Equal(At(21, 30), slots.Last().StartTime);
-        Assert.Equal(840, slots.First().MaxAvailableDurationMinutes);
-        Assert.Equal(90, slots.Last().MaxAvailableDurationMinutes);
+        // MaxAvailableDurationMinutes is the bookable game length (the 90-min package here), not room.
+        Assert.All(slots, s => Assert.Equal(90, s.MaxAvailableDurationMinutes));
         // Starts that leave an idle gap are offered too - choice beats zero idle minutes.
         Assert.Contains(At(9, 30), starts);
         Assert.Contains(At(10, 0), starts);
@@ -62,14 +62,29 @@ public class SlotPackerTests
     }
 
     [Fact]
-    public void AllFittingGridStartsOffered_EvenWhenTheyLeaveAGap()
+    public void NearClose_WhereOnlyAShorterGameFits_OffersADowngradeSlot()
     {
-        // 150-min window, 120-min package: 09:00 and 09:30 both fit (each leaves 30 min idle).
+        // 150-min window (09:00-11:30) for a 120-min package. 09:00/09:30 fit the full game; at 10:00
+        // only a 90-min game still fits before close, so it's offered as a downgrade (MaxAvail = 90).
         var slots = Pack(At(11, 30), blocked: 120, client: 80, NoBusy);
+        var byStart = slots.ToDictionary(s => s.StartTime, s => s.MaxAvailableDurationMinutes);
 
-        Assert.Equal(
-            new HashSet<DateTimeOffset> { At(9, 0), At(9, 30) },
-            slots.Select(s => s.StartTime).ToHashSet());
+        Assert.Equal(120, byStart[At(9, 0)]);
+        Assert.Equal(120, byStart[At(9, 30)]);
+        Assert.Equal(90, byStart[At(10, 0)]); // downgrade: only a 1.5h game fits here
+    }
+
+    [Fact]
+    public void WhereOnlyAShorterGameFitsBetweenTwoBookings_ItIsOfferedAsADowngrade()
+    {
+        // Two 120-min bookings leave a 90-min hole [11:00,12:30]. A Combat (120) can't fit, but a
+        // 90-min game fits flush, so the start is offered with MaxAvailableDurationMinutes = 90.
+        var slots = Pack(At(23, 0), blocked: 120, client: 110,
+            (At(9, 0), At(11, 0)), (At(12, 30), At(14, 30)));
+
+        var hole = slots.SingleOrDefault(s => s.StartTime == At(11, 0));
+        Assert.NotNull(hole);
+        Assert.Equal(90, hole!.MaxAvailableDurationMinutes);
     }
 
     [Fact]
@@ -112,8 +127,8 @@ public class SlotPackerTests
         var first = slots[0];
 
         Assert.Equal(At(9, 0), first.StartTime);
-        Assert.Equal(At(9, 50), first.EndTime);               // client-facing 50 min, not 90
-        Assert.Equal(840, first.MaxAvailableDurationMinutes); // room to end of window
+        Assert.Equal(At(9, 50), first.EndTime);             // client-facing 50 min, not 90
+        Assert.Equal(90, first.MaxAvailableDurationMinutes); // the bookable game length
     }
 
     [Fact]

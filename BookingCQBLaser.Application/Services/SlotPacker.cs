@@ -6,9 +6,11 @@ namespace BookingCQBLaser.Application.Services;
 /// <summary>
 /// Provides the two packing strategies the arena uses.
 /// <para><see cref="PackTileable"/> offers every grid-aligned start that fits, except ones that would
-/// leave an unsellable dead break next to an existing booking: a booking may sit flush against another,
-/// or leave a gap big enough to still sell a game, but never a small gap (shorter than the shortest
-/// game) between it and a neighbour. Gaps against the day's open/close don't count.</para>
+/// leave an unsellable dead break next to an existing booking (a gap shorter than the shortest game;
+/// flush or a sellable gap is fine, and gaps at the day's open/close don't count). Each slot's
+/// <c>MaxAvailableDurationMinutes</c> is the longest game bookable at that start up to the selected
+/// package - equal to it on a normal slot, or a shorter game on a "downgrade" slot where only a smaller
+/// package fits, which the front end surfaces as "available with a smaller package".</para>
 /// <para><see cref="PackAnchoredThenFlush"/> offers a fixed set of anchor starts while the region is
 /// empty, then flush-only starts once a group exists, so groups chain with no empty window.</para>
 /// </summary>
@@ -20,6 +22,11 @@ public sealed class SlotPacker : ISlotPacker
     // won't leave one between two bookings. Derived from the package table.
     private static readonly int MinGameMinutes =
         Enum.GetValues<PackageType>().Select(p => p.GetBaseDurationMinutes()).Min();
+
+    // The distinct game lengths the arena offers (90 and 120 today), longest first - used to find the
+    // biggest game that still fits a start when the selected package is too long for it.
+    private static readonly int[] DurationsLongestFirst =
+        Enum.GetValues<PackageType>().Select(p => p.GetBaseDurationMinutes()).Distinct().OrderByDescending(d => d).ToArray();
 
     public SlotPacker(AvailabilityOptions options)
     {
@@ -36,18 +43,58 @@ public sealed class SlotPacker : ISlotPacker
         var merged = MergeBusyPeriods(busyPeriods);
         var freeWindows = GetFreeWindows(dayStart, dayEnd, merged);
 
+        var interval = _options.SlotIntervalMinutes;
         var slots = new List<TimeSlotDto>();
+
         foreach (var (windowStart, windowEnd) in freeWindows)
         {
             // A window edge that is a day boundary (open/close) allows any gap; an edge that is an
             // existing booking must not be left with a small, unsellable break.
             var leftBoundedByBooking = windowStart != dayStart;
             var rightBoundedByBooking = windowEnd != dayEnd;
-            slots.AddRange(PackWindow(windowStart, windowEnd, packageBlockedDurationMinutes, clientGameDurationMinutes,
-                leftBoundedByBooking, rightBoundedByBooking));
+
+            for (var start = windowStart; start.AddMinutes(MinGameMinutes) <= windowEnd; start = start.AddMinutes(interval))
+            {
+                var leftGap = (int)(start - windowStart).TotalMinutes;
+                if (leftBoundedByBooking && leftGap != 0 && leftGap < MinGameMinutes) continue;
+
+                // The biggest game - no longer than the one they chose - that fits here without leaving
+                // a dead break. If it is shorter than the selected package, the slot is still offered so
+                // the front end can show "available with a smaller package" rather than hiding it.
+                var bookable = LargestBookableDuration(start, windowEnd, packageBlockedDurationMinutes, rightBoundedByBooking);
+                if (bookable == 0) continue;
+
+                slots.Add(new TimeSlotDto(start, start.AddMinutes(clientGameDurationMinutes), bookable));
+            }
         }
 
         return slots.OrderBy(s => s.StartTime).ToList();
+    }
+
+    /// <summary>
+    /// The longest game, up to <paramref name="maxDurationMinutes"/> (the selected package), that fits
+    /// starting at <paramref name="start"/> without leaving an unsellable break before the next booking;
+    /// 0 if nothing fits. Returned as <c>MaxAvailableDurationMinutes</c>: equal to the selected package
+    /// when it fits (a compatible slot), or a smaller game when only that fits (a downgrade slot).
+    /// </summary>
+    private int LargestBookableDuration(
+        DateTimeOffset start,
+        DateTimeOffset windowEnd,
+        int maxDurationMinutes,
+        bool rightBoundedByBooking)
+    {
+        foreach (var duration in DurationsLongestFirst)
+        {
+            if (duration > maxDurationMinutes) continue;        // never offer a longer game than chosen
+            if (start.AddMinutes(duration) > windowEnd) continue; // must physically fit
+
+            var rightGap = (int)(windowEnd - start).TotalMinutes - duration;
+            if (rightBoundedByBooking && rightGap != 0 && rightGap < MinGameMinutes) continue; // no dead break
+
+            return duration;
+        }
+
+        return 0;
     }
 
     public IReadOnlyList<TimeSlotDto> PackAnchoredThenFlush(
@@ -116,39 +163,6 @@ public sealed class SlotPacker : ISlotPacker
             if (busyStart > start && busyStart < next) next = busyStart;
         }
         return next;
-    }
-
-    /// <summary>
-    /// Offers every grid-aligned start that fits, except those that would strand an unsellable break
-    /// (shorter than the shortest game) between this booking and an adjacent existing booking. A gap
-    /// against a day boundary (open/close) is always allowed; a gap next to a booking must be zero
-    /// (flush) or at least one game long.
-    /// </summary>
-    private List<TimeSlotDto> PackWindow(
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
-        int packageBlockedDuration,
-        int clientGameDuration,
-        bool leftBoundedByBooking,
-        bool rightBoundedByBooking)
-    {
-        var interval = _options.SlotIntervalMinutes;
-        var slots = new List<TimeSlotDto>();
-
-        for (var start = windowStart; start.AddMinutes(packageBlockedDuration) <= windowEnd; start = start.AddMinutes(interval))
-        {
-            var leftGap = (int)(start - windowStart).TotalMinutes;
-            var rightGap = (int)(windowEnd - start).TotalMinutes - packageBlockedDuration;
-
-            // Never leave a small dead break next to an existing booking (gaps at the day's edges are fine).
-            if (leftBoundedByBooking && leftGap != 0 && leftGap < MinGameMinutes) continue;
-            if (rightBoundedByBooking && rightGap != 0 && rightGap < MinGameMinutes) continue;
-
-            var maxAvailableDuration = (int)(windowEnd - start).TotalMinutes;
-            slots.Add(new TimeSlotDto(start, start.AddMinutes(clientGameDuration), maxAvailableDuration));
-        }
-
-        return slots;
     }
 
     private static List<(DateTimeOffset Start, DateTimeOffset End)> GetFreeWindows(
